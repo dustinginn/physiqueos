@@ -849,10 +849,22 @@ struct ProductionLogAPI: LogAPI {
     }
 
     func fetchLog() async throws -> LogReadModel {
-        async let logRead = api.readResource("evidence-review-queue", query: ["timeZone": timeZone().identifier], as: Payload.self)
-        async let weightRead = api.readResource("weight", query: ["context": "all"], as: WeightPayload.self)
-        let payload = try await logRead.data
-        let weightPayload = try? await weightRead.data
+        let query = ["timeZone": timeZone().identifier]
+        let payload: Payload
+        let isLastKnown: Bool
+        do {
+            let envelope: ProductionResponseEnvelope<Payload> = try await api.readResource("evidence-review-queue", query: query, as: Payload.self)
+            payload = envelope.data
+            isLastKnown = false
+        } catch {
+            guard let snapshot = await api.lastKnownResource("evidence-review-queue", query: query, as: Payload.self) else { throw error }
+            payload = snapshot.data
+            isLastKnown = true
+        }
+        let weightEnvelope: ProductionResponseEnvelope<WeightPayload>? = try? await api.readResource(
+            "weight", query: ["context": "all"], as: WeightPayload.self
+        )
+        let weightPayload = weightEnvelope?.data
 
         var rows = payload.loggedToday.rows.map { row in
             LoggedTodayRow(
@@ -916,6 +928,15 @@ struct ProductionLogAPI: LogAPI {
 
         var pending = payload.pendingEvidenceReviews.map(Self.pendingReview)
         var processing = payload.processingEvidenceReviews ?? []
+        for index in processing.indices {
+            processing[index].processing = await api.reconcileEvidenceProcessing(
+                reviewId: processing[index].id, incoming: processing[index].processing
+            )
+            Self.overlayProcessingRow(
+                domain: processing[index].domain, localDate: processing[index].localDate,
+                today: payload.localDate, state: processing[index].processing, rows: &rows
+            )
+        }
         let acknowledgments = await api.acceptedEvidenceReviewProcessingAcknowledgments()
         for acknowledgment in acknowledgments {
             if processing.contains(where: { $0.id == acknowledgment.id }) { continue }
@@ -924,8 +945,8 @@ struct ProductionLogAPI: LogAPI {
                 continue
             }
 
-            let status = try? await ProductionEvidenceReviewAPI(api: api)
-                .fetchReview(reviewId: acknowledgment.id)?.status
+            let detail = try? await ProductionEvidenceReviewAPI(api: api).fetchReview(reviewId: acknowledgment.id)
+            let status = detail?.status
             if ["commit_failed", "partially_committed"].contains(status) {
                 await api.clearAcceptedEvidenceReviewProcessing(reviewId: acknowledgment.id)
                 continue
@@ -944,11 +965,11 @@ struct ProductionLogAPI: LogAPI {
             processing.append(.init(
                 id: acknowledgment.id, localDate: localDate,
                 domain: acknowledgment.domain, label: acknowledgment.label,
-                status: status ?? "accepted_processing"
+                status: status ?? "accepted_processing", processing: detail?.processing ?? acknowledgment.processing
             ))
             Self.overlayProcessingRow(
                 domain: acknowledgment.domain, localDate: localDate,
-                today: payload.localDate, rows: &rows
+                today: payload.localDate, state: detail?.processing ?? acknowledgment.processing, rows: &rows
             )
         }
 
@@ -957,12 +978,13 @@ struct ProductionLogAPI: LogAPI {
             loggedToday: rows,
             pendingEvidenceReviews: pending,
             processingEvidenceReviews: processing,
-            typedProvenance: typedProvenance
+            typedProvenance: typedProvenance,
+            isLastKnown: isLastKnown
         )
     }
 
     private static func overlayProcessingRow(
-        domain: String, localDate: String, today: String,
+        domain: String, localDate: String, today: String, state: EvidenceProcessingReadState,
         rows: inout [LoggedTodayRow]
     ) {
         guard localDate == today,
@@ -970,8 +992,8 @@ struct ProductionLogAPI: LogAPI {
               let index = rows.firstIndex(where: { $0.kind == kind && $0.destination == nil })
         else { return }
         rows[index].summary = "\(kind.label) processing"
-        rows[index].context = "Confirmation accepted · No action required"
-        rows[index].contextDetail = "Confirmation accepted · No action required"
+        rows[index].context = state.message
+        rows[index].contextDetail = state.message
         rows[index].provenance = nil
         rows[index].processing = true
         rows[index].lines = nil

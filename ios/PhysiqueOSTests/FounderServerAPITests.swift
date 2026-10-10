@@ -1498,7 +1498,7 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     func testOnlyAllowlistedResourcesPersistLastKnownSnapshots() {
-        XCTAssertEqual(ProductionNativeAPI.lastKnownSnapshotResources, ["home"])
+        XCTAssertEqual(ProductionNativeAPI.lastKnownSnapshotResources, ["evidence-review", "evidence-review-queue", "home"])
         XCTAssertEqual(ProductionReadSnapshotStore.fileName(for: "home?presentationVersion=2"), "home%3FpresentationVersion%3D2")
     }
 
@@ -2929,7 +2929,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertFalse(log.hasPendingEvidenceReviews)
         let nutrition = try XCTUnwrap(log.loggedToday.first { $0.kind == .nutrition })
         XCTAssertEqual(nutrition.summary, "Nutrition processing")
-        XCTAssertEqual(nutrition.context, "Confirmation accepted · No action required")
+        XCTAssertEqual(nutrition.context, "Confirmation saved · Finishing 0 of 9")
         XCTAssertEqual(nutrition.processing, true)
         XCTAssertNil(nutrition.destination, "Accepted processing is not fabricated as canonical logged data.")
         XCTAssertEqual(log.processingEvidenceReviews?.map(\.id), ["review-nutrition"])
@@ -2963,7 +2963,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(log.processingEvidenceReviews?.map(\.id), ["review-training"])
         let training = try XCTUnwrap(log.loggedToday.first { $0.kind == .training })
         XCTAssertEqual(training.summary, "Training processing")
-        XCTAssertEqual(training.context, "Confirmation accepted · No action required")
+        XCTAssertEqual(training.context, "Confirmation saved · Waiting for secure processing")
         XCTAssertEqual(training.processing, true)
         XCTAssertNil(training.destination)
     }
@@ -2991,6 +2991,84 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(log.pendingEvidenceReviews.map(\.id), ["review-training"])
         XCTAssertTrue(log.processingEvidenceReviews?.isEmpty == true)
         XCTAssertEqual(log.pendingEvidenceReviews.first?.destination, .evidenceReview(reviewId: "review-training"))
+    }
+
+    func testDurableProcessingProjectionDecodesCountsUnknownStatesAndNeverRegresses() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let decoded = try decoder.decode(EvidenceProcessingReadState.self, from: Data(#"{"state":"future_phase","completedSteps":12,"totalSteps":9,"nextStep":"briefing_generation","canonicalStateDurable":true,"actionRequired":false,"message":"Server is finishing safely"}"#.utf8))
+        XCTAssertEqual(decoded.state, "future_phase")
+        XCTAssertEqual(decoded.completedSteps, 9, "Wire counts are clamped to a valid progress range.")
+        XCTAssertEqual(decoded.message, "Server is finishing safely")
+
+        let prior = EvidenceProcessingReadState(state: "processing", completedSteps: 6, totalSteps: 9)
+        XCTAssertEqual(prior.progressText, "6 of 9 steps")
+        let stale = EvidenceProcessingReadState(state: "queued", completedSteps: 2, totalSteps: 9)
+        XCTAssertEqual(stale.merged(after: prior), prior)
+        let failure = EvidenceProcessingReadState(state: "failed", completedSteps: 4, totalSteps: 9, actionRequired: true)
+        XCTAssertEqual(failure.merged(after: prior), failure, "Authoritative terminal failures must win immediately.")
+    }
+
+    func testAcceptedProcessingSurvivesProcessRelaunchAndSessionBoundaryClearsIt() async throws {
+        let store = Self.temporarySnapshotStore()
+        let first = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: SequencedFounderTransport([]), snapshotStore: store)
+        await first.acknowledgeAcceptedEvidenceReviewProcessing(.init(
+            id: "review-dexa", localDate: "2026-10-10", domain: "dexa", label: "DEXA",
+            processing: .init(state: "processing", completedSteps: 4, totalSteps: 9)
+        ))
+
+        let relaunched = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: SequencedFounderTransport([]), snapshotStore: store)
+        let restored = await relaunched.acceptedEvidenceReviewProcessingAcknowledgments()
+        XCTAssertEqual(restored.first?.id, "review-dexa")
+        XCTAssertEqual(restored.first?.processing.completedSteps, 4)
+
+        await relaunched.clearAcceptedEvidenceReviewProcessing(reviewId: "review-dexa")
+        let afterClear = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: SequencedFounderTransport([]), snapshotStore: store)
+        let cleared = await afterClear.acceptedEvidenceReviewProcessingAcknowledgments()
+        XCTAssertTrue(cleared.isEmpty)
+    }
+
+    func testProductionLogUsesServerDurableProcessingStateAsSourceOfTruth() async throws {
+        let queue = productionEnvelope(
+            resource: "evidence-review-queue",
+            data: #"{"localDate":"2026-10-10","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[],"processingEvidenceReviews":[{"id":"review-dexa","localDate":"2026-10-10","domain":"dexa","label":"DEXA","status":"processing","processing":{"state":"retrying","completedSteps":5,"totalSteps":9,"nextStep":"analysis","canonicalStateDurable":true,"actionRequired":false,"message":"Confirmation saved · Retrying safely"}}]}"#
+        )
+        let transport = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [
+            "evidence-review-queue": queue,
+            "weight": productionWeightForLogJSON(date: nil, value: nil),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertEqual(log.processingEvidenceReviews?.first?.processing.state, "retrying")
+        XCTAssertEqual(log.processingEvidenceReviews?.first?.processing.completedSteps, 5)
+        XCTAssertEqual(log.genericProcessingEvidenceReviews.first?.id, "review-dexa")
+    }
+
+    func testProductionLogRestoresLastKnownProcessingStateDuringOfflineRelaunch() async throws {
+        let queue = productionEnvelope(
+            resource: "evidence-review-queue",
+            data: #"{"localDate":"2026-10-10","loggedToday":{"rows":[{"id":"training","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"nutrition","summary":"Nothing logged yet","context":null,"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"recordId":null}]},"pendingEvidenceReviews":[],"processingEvidenceReviews":[{"id":"review-dexa","localDate":"2026-10-10","domain":"dexa","label":"DEXA","status":"processing","processing":{"state":"processing","completedSteps":6,"totalSteps":9,"nextStep":"briefing_generation","canonicalStateDurable":true,"actionRequired":false,"message":"Confirmation saved · Finishing safely"}}]}"#
+        )
+        let base = RoutedFounderTransport(pairing: sessionJSON(access: "a", refresh: "r"), byResource: [
+            "evidence-review-queue": queue,
+            "weight": productionWeightForLogJSON(date: nil, value: nil),
+        ])
+        let transport = HostResolutionOutageTransport(base: base)
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport,
+            snapshotStore: Self.temporarySnapshotStore()
+        )
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        _ = try await ProductionLogAPI(api: native).fetchLog()
+
+        await transport.setOutage(true)
+        await native.invalidateReadResources(["evidence-review-queue"], retainingLastKnown: true)
+        let offline = try await ProductionLogAPI(api: native).fetchLog()
+
+        XCTAssertEqual(offline.isLastKnown, true)
+        XCTAssertEqual(offline.processingEvidenceReviews?.first?.processing.completedSteps, 6)
+        XCTAssertEqual(offline.processingEvidenceReviews?.first?.processing.state, "processing")
     }
 
     /// The architectural defect was that `logAPI` could never have

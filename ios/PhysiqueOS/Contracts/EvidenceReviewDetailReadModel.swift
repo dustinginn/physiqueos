@@ -18,6 +18,10 @@ struct EvidenceReviewDetailReadModel: Equatable {
     var items: [EvidenceReviewDetailItem]
     var summary: String? = nil
     var excludedSummary: String? = nil
+    /// Server-owned durable post-confirmation state. Unknown future states
+    /// remain renderable and never become a second confirmation action.
+    var processing: EvidenceProcessingReadState? = nil
+    var isLastKnown: Bool = false
     /// Present only for a typed HealthKit ↔ Workout Logger identity review.
     /// It is reconciliation evidence, never strategic/coaching evidence.
     var workoutReconciliation: WorkoutReconciliationDetail? = nil

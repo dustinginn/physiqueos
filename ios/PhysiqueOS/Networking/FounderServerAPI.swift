@@ -410,13 +410,15 @@ actor ProductionNativeAPI {
     private var readCacheGeneration = 0
     private let maximumCachedReads = 32
     private var acceptedEvidenceReviewProcessing: [String: AcceptedEvidenceReviewProcessing] = [:]
+    private var evidenceProcessingStates: [String: EvidenceProcessingReadState] = [:]
     private let snapshotStore: ProductionReadSnapshotStore?
+    private static let evidenceProcessingPersistenceKey = "_evidence-processing-state.v1"
 
     /// Resources whose last validated envelope survives process death so a
     /// cold launch can show last-known content while the authoritative read
     /// runs. Snapshots are never served as a read result — only through
     /// `lastKnownResource`, which callers must present as last-known.
-    static let lastKnownSnapshotResources: Set<String> = ["home"]
+    static let lastKnownSnapshotResources: Set<String> = ["home", "evidence-review-queue", "evidence-review"]
 
     enum ReadPolicy: Sendable, Equatable {
         case cacheFirst
@@ -450,6 +452,11 @@ actor ProductionNativeAPI {
         self.transport = transport
         self.commandTransport = commandTransport ?? transport
         self.snapshotStore = snapshotStore
+        if let data = snapshotStore?.load(for: Self.evidenceProcessingPersistenceKey),
+           let persisted = try? JSONDecoder().decode(PersistedEvidenceProcessing.self, from: data) {
+            self.acceptedEvidenceReviewProcessing = Dictionary(uniqueKeysWithValues: persisted.acknowledgments.map { ($0.id, $0) })
+            self.evidenceProcessingStates = persisted.states
+        }
     }
 
     func hasStoredSession() throws -> Bool {
@@ -695,6 +702,8 @@ actor ProductionNativeAPI {
     /// any read still in flight from re-persisting after the snapshots go.
     private func retireAllLastKnownSnapshots() {
         readCacheGeneration += 1
+        acceptedEvidenceReviewProcessing = [:]
+        evidenceProcessingStates = [:]
         snapshotStore?.removeAll()
         sessionBoundaryObserver?()
     }
@@ -710,7 +719,12 @@ actor ProductionNativeAPI {
     }
 
     func acknowledgeAcceptedEvidenceReviewProcessing(_ value: AcceptedEvidenceReviewProcessing) {
-        acceptedEvidenceReviewProcessing[value.id] = value
+        let state = value.processing.merged(after: evidenceProcessingStates[value.id])
+        var durable = value
+        durable.processing = state
+        acceptedEvidenceReviewProcessing[value.id] = durable
+        evidenceProcessingStates[value.id] = state
+        persistEvidenceProcessing()
     }
 
     func acceptedEvidenceReviewProcessingAcknowledgments() -> [AcceptedEvidenceReviewProcessing] {
@@ -719,6 +733,33 @@ actor ProductionNativeAPI {
 
     func clearAcceptedEvidenceReviewProcessing(reviewId: String) {
         acceptedEvidenceReviewProcessing[reviewId] = nil
+        evidenceProcessingStates[reviewId] = nil
+        persistEvidenceProcessing()
+    }
+
+    func reconcileEvidenceProcessing(reviewId: String, incoming: EvidenceProcessingReadState) -> EvidenceProcessingReadState {
+        let merged = incoming.merged(after: evidenceProcessingStates[reviewId])
+        if merged.isTerminal {
+            evidenceProcessingStates[reviewId] = nil
+            acceptedEvidenceReviewProcessing[reviewId] = nil
+        } else {
+            evidenceProcessingStates[reviewId] = merged
+            if var acknowledgment = acceptedEvidenceReviewProcessing[reviewId] {
+                acknowledgment.processing = merged
+                acceptedEvidenceReviewProcessing[reviewId] = acknowledgment
+            }
+        }
+        persistEvidenceProcessing()
+        return merged
+    }
+
+    private func persistEvidenceProcessing() {
+        let value = PersistedEvidenceProcessing(
+            acknowledgments: acceptedEvidenceReviewProcessing.values.sorted { $0.id < $1.id },
+            states: evidenceProcessingStates
+        )
+        guard let data = try? encoder.encode(value) else { return }
+        snapshotStore?.save(data, for: Self.evidenceProcessingPersistenceKey)
     }
 
     private func loadReadData(resource: String, query: [String: String]) async throws -> Data {
@@ -1583,6 +1624,11 @@ enum SenderConstrainedRefresh {
 
 private struct RevocationResponse: Decodable {
     let revoked: Bool
+}
+
+private struct PersistedEvidenceProcessing: Codable {
+    var acknowledgments: [AcceptedEvidenceReviewProcessing]
+    var states: [String: EvidenceProcessingReadState]
 }
 
 /// Disk persistence for `ProductionNativeAPI.lastKnownSnapshotResources`.

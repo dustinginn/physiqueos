@@ -142,7 +142,7 @@ struct LogView: View {
                 }
 
                 if !log.genericProcessingEvidenceReviews.isEmpty {
-                    processingBand(log.genericProcessingEvidenceReviews)
+                    processingBand(log.genericProcessingEvidenceReviews, isLastKnown: log.isLastKnown == true)
                         .padding(.top, 8)
                 }
 
@@ -158,9 +158,10 @@ struct LogView: View {
         }
     }
 
-    /// Server-owned processing acknowledgement in the review-band grammar.
-    /// It is informational only: no action, no chevron, not a button.
-    private func processingBand(_ reviews: [ProcessingEvidenceReview]) -> some View {
+    /// Server-owned processing state. Failures are the only actionable rows
+    /// and deep-link to the exact saved review; all other states remain
+    /// informational and cannot initiate a duplicate confirmation.
+    private func processingBand(_ reviews: [ProcessingEvidenceReview], isLastKnown: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
                 ProgressView()
@@ -170,18 +171,39 @@ struct LogView: View {
                     .logText(LogType.rowLabel)
                     .foregroundStyle(PhysiqueOSTheme.redesignTeal)
             }
-            ForEach(reviews) { review in
-                Text("\(review.label) confirmation accepted · No action required")
+            if isLastKnown {
+                Text("Last known server status · updates resume when connected")
                     .logText(LogType.meta12)
                     .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .padding(.top, 4)
+            }
+            ForEach(reviews) { review in
+                if review.processing.actionRequired {
+                    Button { onNavigate(.evidenceReview(reviewId: review.id)) } label: {
+                        HStack {
+                            Text("\(review.label): \(review.processing.message)")
+                                .logText(LogType.meta12)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .foregroundStyle(PhysiqueOSTheme.destructive)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                    .accessibilityLabel("\(review.label) processing needs attention")
+                } else {
+                    Text("\(review.label): \(review.processing.message) · \(review.processing.progressText)")
+                        .logText(LogType.meta12)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        .padding(.top, 4)
+                }
             }
         }
         .padding(.vertical, 11)
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(LogBandBackground(tone: PhysiqueOSTheme.redesignTeal))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

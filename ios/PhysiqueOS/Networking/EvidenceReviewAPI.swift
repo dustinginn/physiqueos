@@ -114,10 +114,26 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
     var backgroundTaskScheduler: any BackgroundTaskScheduling = UIKitBackgroundTaskScheduler()
 
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
-        let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
+        let query = ["reviewId": reviewId]
+        let envelope: ProductionResponseEnvelope<Payload>
+        let isLastKnown: Bool
+        do {
+            envelope = try await api.readResource("evidence-review", query: query, policy: .reload, as: Payload.self)
+            isLastKnown = false
+        } catch {
+            guard let snapshot = await api.lastKnownResource("evidence-review", query: query, as: Payload.self) else { throw error }
+            envelope = snapshot
+            isLastKnown = true
+        }
         guard let review = envelope.data.review else { return nil }
         let reconciliation = envelope.data.presentation?.workoutReconciliation
         let isReconciliation = reconciliation != nil
+        let processing: EvidenceProcessingReadState?
+        if let incoming = review.processing {
+            processing = await api.reconcileEvidenceProcessing(reviewId: review.id, incoming: incoming)
+        } else {
+            processing = nil
+        }
         return EvidenceReviewDetailReadModel(
             id: isReconciliation ? (envelope.data.presentation?.id ?? "") : review.id,
             status: isReconciliation ? (envelope.data.presentation?.status ?? "invalid_terminal_history") : review.status,
@@ -181,6 +197,8 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
             },
             summary: envelope.data.presentation?.summary.text,
             excludedSummary: envelope.data.presentation?.summary.excludedText,
+            processing: processing,
+            isLastKnown: isLastKnown,
             workoutReconciliation: reconciliation
         )
     }
@@ -473,6 +491,7 @@ struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
         var createdAt: String?
         var version: Int?
         var interpretedEvidence: InterpretedEvidence?
+        var processing: EvidenceProcessingReadState?
     }
 
     /// Wire keys are snake_case (`evidence_objects`); the shared decoder's

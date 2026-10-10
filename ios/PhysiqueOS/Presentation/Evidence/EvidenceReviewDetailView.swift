@@ -111,7 +111,9 @@ struct EvidenceReviewDetailView: View {
         do {
             let review = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
             state = .loaded(review)
-            if let review, review.status == "committing" {
+            if let review, review.processing?.actionRequired == true {
+                actionState = .failed(review.processing?.message ?? "Processing needs attention. Your confirmation is saved.")
+            } else if let review, review.status == "committing" {
                 actionState = .accepted
             }
         } catch {
@@ -240,7 +242,15 @@ struct EvidenceReviewDetailView: View {
     private func workoutMatchActions(_ review: EvidenceReviewDetailReadModel) -> some View {
         switch actionState {
         case .idle:
-            if review.status == "pending", let reconciliation = review.workoutReconciliation {
+            if review.isLastKnown {
+                workoutMatchState(
+                    .waiting,
+                    title: "Last known status",
+                    detail: Self.lastKnownProcessingCopy,
+                    actionTitle: "Check Now",
+                    identifier: "evidenceReview.workoutMatch.lastKnown"
+                ) { Task { await load() } }
+            } else if review.status == "pending", let reconciliation = review.workoutReconciliation {
                 VStack(spacing: 12) {
                     ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
                         Group {
@@ -297,9 +307,9 @@ struct EvidenceReviewDetailView: View {
             ) { onReturnToLog(); dismiss() }
         case .accepted:
             workoutMatchState(
-                .success,
-                title: "Confirmation accepted",
-                detail: Self.backgroundCopy,
+                .waiting,
+                title: "Confirmation saved",
+                detail: review.isLastKnown ? Self.lastKnownProcessingCopy : (review.processing?.message ?? Self.processingCopy),
                 actionTitle: "Back to Log",
                 identifier: "evidenceReview.workoutMatch.accepted"
             ) { onReturnToLog(); dismiss() }
@@ -727,7 +737,9 @@ struct EvidenceReviewDetailView: View {
     private func actionSection(for review: EvidenceReviewDetailReadModel) -> some View {
         switch actionState {
         case .idle:
-            if review.status == "confirmed" {
+            if review.isLastKnown {
+                processingActions(review.processing, isLastKnown: true)
+            } else if review.status == "confirmed" {
                 completionActions(label: "Confirmed")
             } else if let reconciliation = review.workoutReconciliation, review.status == "pending" {
                 VStack(spacing: 10) {
@@ -783,7 +795,7 @@ struct EvidenceReviewDetailView: View {
         case .dismissed:
             Label("Dismissed", systemImage: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textSecondary)
         case .accepted:
-            completionActions(label: "Confirmation accepted")
+            processingActions(review.processing, isLastKnown: review.isLastKnown)
         case .confirmed:
             completionActions(label: "Confirmed")
         case .workoutReconciliationResolved(let action):
@@ -836,6 +848,26 @@ struct EvidenceReviewDetailView: View {
                 dismiss()
             }
             .accessibilityIdentifier("evidenceReview.backToLog")
+        }
+    }
+
+    private func processingActions(_ processing: EvidenceProcessingReadState?, isLastKnown: Bool) -> some View {
+        let state = processing ?? EvidenceProcessingReadState(state: "accepted")
+        return CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    ProgressView().tint(PhysiqueOSTheme.accent)
+                    Text("Confirmation saved").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                }
+                Text(isLastKnown ? Self.lastKnownProcessingCopy : state.message)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(state.progressText)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Button("Check Now") { Task { await load(); actionState = .idle } }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1693,7 +1725,9 @@ extension EvidenceReviewDetailView {
     private func genericActions(_ review: EvidenceReviewDetailReadModel) -> some View {
         switch actionState {
         case .idle:
-            if review.status == "confirmed" {
+            if review.isLastKnown {
+                lifecycleCard(.spinner, "Last known status", copy: Self.lastKnownProcessingCopy, back: true)
+            } else if review.status == "confirmed" {
                 lifecycleCard(.icon(.ok), "Confirmed", copy: Self.backgroundCopy, back: true)
             } else if review.status == "committing" {
                 lifecycleCard(.spinner, "Confirming…")
@@ -1722,7 +1756,7 @@ extension EvidenceReviewDetailView {
         case .dismissed:
             lifecycleCard(.icon(.muted), "Dismissed")
         case .accepted:
-            lifecycleCard(.icon(.ok), "Confirmation accepted", copy: Self.backgroundCopy, back: true)
+            lifecycleCard(.spinner, "Confirmation saved", copy: review.isLastKnown ? Self.lastKnownProcessingCopy : (review.processing?.message ?? Self.processingCopy), back: true)
         case .confirmed:
             lifecycleCard(.icon(.ok), "Confirmed", copy: Self.backgroundCopy, back: true)
         case .workoutReconciliationResolved:
@@ -1752,6 +1786,8 @@ extension EvidenceReviewDetailView {
     }
 
     static let backgroundCopy = "PhysiqueOS owns this confirmation. Remaining analysis and briefing updates continue in the background."
+    static let processingCopy = "Your confirmation is saved. Secure server processing continues even if you close the app."
+    static let lastKnownProcessingCopy = "Showing the last known server status. Processing continues on the server; status updates resume when connected."
 
     private func lifecycleCard(_ lead: WorkflowStateRow<EmptyView>.Lead, _ title: String, copy: String? = nil, back: Bool = false) -> some View {
         WorkflowSurface(tone: .rich) {

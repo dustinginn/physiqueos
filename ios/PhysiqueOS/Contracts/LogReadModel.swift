@@ -27,6 +27,9 @@ struct LogReadModel: Codable, Equatable {
     /// legacy `context` caption verbatim and no Sources disclosure appears,
     /// because provenance is never parsed out of display strings.
     var typedProvenance: Bool? = nil
+    /// True only when an explicitly persisted, previously validated queue
+    /// snapshot is being shown while the authoritative read is unavailable.
+    var isLastKnown: Bool? = nil
 
     var hasPendingEvidenceReviews: Bool { !pendingEvidenceReviews.isEmpty }
     var usesTypedProvenance: Bool { typedProvenance == true }
@@ -169,23 +172,125 @@ struct LoggedTodaySourceEntry: Equatable, Identifiable {
     }
 }
 
+struct EvidenceProcessingReadState: Codable, Equatable, Sendable {
+    var state: String
+    var completedSteps: Int
+    var totalSteps: Int
+    var nextStep: String?
+    var canonicalStateDurable: Bool
+    var actionRequired: Bool
+    var message: String
+
+    init(
+        state: String, completedSteps: Int = 0, totalSteps: Int = 9,
+        nextStep: String? = nil, canonicalStateDurable: Bool = false,
+        actionRequired: Bool = false, message: String? = nil
+    ) {
+        let safeTotal = max(1, totalSteps)
+        self.state = state
+        self.completedSteps = min(max(0, completedSteps), safeTotal)
+        self.totalSteps = safeTotal
+        self.nextStep = nextStep
+        self.canonicalStateDurable = canonicalStateDurable
+        self.actionRequired = actionRequired || state == "failed"
+        self.message = message ?? Self.fallbackMessage(state: state, completed: self.completedSteps, total: safeTotal)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            state: try container.decodeIfPresent(String.self, forKey: .state) ?? "unknown",
+            completedSteps: try container.decodeIfPresent(Int.self, forKey: .completedSteps) ?? 0,
+            totalSteps: try container.decodeIfPresent(Int.self, forKey: .totalSteps) ?? 9,
+            nextStep: try container.decodeIfPresent(String.self, forKey: .nextStep),
+            canonicalStateDurable: try container.decodeIfPresent(Bool.self, forKey: .canonicalStateDurable) ?? false,
+            actionRequired: try container.decodeIfPresent(Bool.self, forKey: .actionRequired) ?? false,
+            message: try container.decodeIfPresent(String.self, forKey: .message)
+        )
+    }
+
+    /// A stale response can never move a visible operation backwards. Server
+    /// terminal states still win immediately, including a failure that needs
+    /// user action after earlier canonical durability.
+    func merged(after prior: EvidenceProcessingReadState?) -> EvidenceProcessingReadState {
+        guard let prior else { return self }
+        if ["ready", "failed"].contains(state) { return self }
+        if ["ready", "failed"].contains(prior.state) { return prior }
+        guard completedSteps >= prior.completedSteps else { return prior }
+        if completedSteps == prior.completedSteps && phaseRank < prior.phaseRank { return prior }
+        return self
+    }
+
+    var progressText: String { "\(completedSteps) of \(totalSteps) steps" }
+    var isTerminal: Bool { state == "ready" || state == "failed" }
+
+    private var phaseRank: Int {
+        ["accepted": 0, "queued": 1, "processing": 2, "retrying": 3, "ready": 4, "failed": 4][state] ?? 2
+    }
+
+    private static func fallbackMessage(state: String, completed: Int, total: Int) -> String {
+        switch state {
+        case "accepted": "Confirmation saved · Waiting for secure processing"
+        case "queued": "Confirmation saved · Queued for secure processing"
+        case "processing": "Confirmation saved · Finishing \(completed) of \(total)"
+        case "retrying": "Confirmation saved · Retrying safely"
+        case "ready": "Ready"
+        case "failed": "Processing needs attention · Your confirmation is saved"
+        default: "Confirmation saved · Checking processing status"
+        }
+    }
+}
+
 struct ProcessingEvidenceReview: Codable, Equatable, Identifiable {
     var id: String
     var localDate: String
     var domain: String
     var label: String
     var status: String
+    var processing: EvidenceProcessingReadState
+
+    init(id: String, localDate: String, domain: String, label: String, status: String, processing: EvidenceProcessingReadState? = nil) {
+        self.id = id
+        self.localDate = localDate
+        self.domain = domain
+        self.label = label
+        self.status = status
+        self.processing = processing ?? EvidenceProcessingReadState(state: Self.phase(for: status))
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let status = try container.decode(String.self, forKey: .status)
+        self.init(
+            id: try container.decode(String.self, forKey: .id),
+            localDate: try container.decode(String.self, forKey: .localDate),
+            domain: try container.decode(String.self, forKey: .domain),
+            label: try container.decode(String.self, forKey: .label),
+            status: status,
+            processing: try container.decodeIfPresent(EvidenceProcessingReadState.self, forKey: .processing)
+        )
+    }
+
+    private static func phase(for status: String) -> String {
+        switch status {
+        case "confirmed": "ready"
+        case "commit_failed", "partially_committed": "failed"
+        case "committing": "processing"
+        default: status == "accepted_processing" ? "accepted" : "unknown"
+        }
+    }
 }
 
-/// Ephemeral client acknowledgment of a Server-accepted confirmation. It
+/// Persisted client acknowledgment of a Server-accepted confirmation. It
 /// bridges only the read-projection race between the durable command
 /// receipt and the queue's next lifecycle snapshot; the Server review
 /// status remains authoritative and terminal failures restore retry UI.
-struct AcceptedEvidenceReviewProcessing: Equatable, Sendable {
+struct AcceptedEvidenceReviewProcessing: Codable, Equatable, Sendable {
     var id: String
     var localDate: String?
     var domain: String
     var label: String
+    var processing: EvidenceProcessingReadState = .init(state: "accepted")
 }
 
 struct PendingEvidenceReview: Codable, Equatable, Identifiable {
