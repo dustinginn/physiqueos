@@ -1,0 +1,96 @@
+[
+  {
+    "name": "only goal name and end date are marked as records",
+    "pass": true,
+    "got": [
+      "goal",
+      "dates"
+    ],
+    "want": [
+      "goal",
+      "dates"
+    ]
+  },
+  {
+    "name": "every outcome number is marked simulated",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "scenarios B and C have no earlier cut",
+    "pass": true,
+    "got": [
+      null,
+      null
+    ],
+    "want": [
+      null,
+      null
+    ]
+  },
+  {
+    "name": "−450/day → similar pace to 0.8 lb/week",
+    "pass": true,
+    "got": "about the pace that held your lean mass last time",
+    "want": "about the pace that held your lean mass last time"
+  },
+  {
+    "name": "−500/day → a little faster",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "−250/day → gentler",
+    "pass": true,
+    "got": "gentler than last time",
+    "want": "gentler than last time"
+  },
+  {
+    "name": "eat 1,717 vs 1,700 → about the same",
+    "pass": true,
+    "got": "about what you ate last time",
+    "want": "about what you ate last time"
+  },
+  {
+    "name": "activity 900 vs 850 → close",
+    "pass": true,
+    "got": "close to what you sustained last time",
+    "want": "close to what you sustained last time"
+  },
+  {
+    "name": "activity 1,100 vs 850 → more",
+    "pass": true,
+    "got": "more than you averaged last time",
+    "want": "more than you averaged last time"
+  },
+  {
+    "name": "no history → no comparisons",
+    "pass": true,
+    "got": [
+      null,
+      null,
+      null
+    ],
+    "want": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "name": "food average marked rough below 70% logged days",
+    "pass": true,
+    "got": [
+      false,
+      true,
+      false
+    ],
+    "want": [
+      false,
+      true,
+      false
+    ]
+  }
+]

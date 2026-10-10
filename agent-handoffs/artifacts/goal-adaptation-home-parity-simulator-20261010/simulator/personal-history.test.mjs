@@ -1,0 +1,21 @@
+// Unit tests for personal-history.js. Usage: node personal-history.test.mjs
+import fs from 'node:fs'; import vm from 'node:vm'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+const dir = path.dirname(fileURLToPath(import.meta.url));
+const ctx = { module: { exports: {} } }; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(dir, 'personal-history.js'), 'utf8'), ctx);
+const H = ctx.module.exports; const r = []; const eq = (n, got, want) => r.push({ name: n, pass: JSON.stringify(got) === JSON.stringify(want), got, want });
+const a = H.cutHistory('A');
+eq('only goal name and end date are marked as records', Object.entries(a).filter(([, v]) => v.prov === 'record').map(([k]) => k), ['goal', 'dates']);
+eq('every outcome number is marked simulated', ['intake', 'activity', 'rate', 'lean', 'strength'].every((k) => a[k].prov === 'sim'), true);
+eq('scenarios B and C have no earlier cut', [H.cutHistory('B'), H.cutHistory('C')], [null, null]);
+eq('−450/day → similar pace to 0.8 lb/week', H.paceVsLast(-450, a), 'about the pace that held your lean mass last time');
+eq('−500/day → a little faster', H.paceVsLast(-500, a).startsWith('a little faster'), true);
+eq('−250/day → gentler', H.paceVsLast(-250, a), 'gentler than last time');
+eq('eat 1,717 vs 1,700 → about the same', H.intakeVsLast(1717, a), 'about what you ate last time');
+eq('activity 900 vs 850 → close', H.activityVsLast(900, a), 'close to what you sustained last time');
+eq('activity 1,100 vs 850 → more', H.activityVsLast(1100, a), 'more than you averaged last time');
+eq('no history → no comparisons', [H.paceVsLast(-450, null), H.intakeVsLast(1700, null), H.activityVsLast(900, null)], [null, null, null]);
+eq('food average marked rough below 70% logged days', [H.intakeIsRough(a), H.intakeIsRough({ ...a, intake: { ...a.intake, coverage: 0.32 } }), H.intakeIsRough(null)], [false, true, false]);
+const failed = r.filter((x) => !x.pass);
+fs.writeFileSync(path.join(dir, 'personal-history.test-results.json'), JSON.stringify(r, null, 2));
+console.log(`${r.length - failed.length}/${r.length} personal-history checks passed`); failed.forEach((f) => console.log('FAIL', f.name, JSON.stringify(f.got), JSON.stringify(f.want)));
+process.exitCode = failed.length ? 1 : 0;

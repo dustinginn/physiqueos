@@ -73,3 +73,14 @@
 - **Home:** text only, in the existing slots.
 - **Tests:** `guardrail-model.test.mjs` 32/32; `test-sim.mjs` 109/109; `energy-model.test.mjs` 25/25 (unchanged).
 - **Screenshots:** 16–22 in `simulator/screens/`.
+
+## "Why this plan?" (prompt `61afe17e`)
+
+- **Renamed and rewritten:** "Why these numbers?" is now **"Why this plan?"**. It reads in three short coach-like parts:
+  1. **What worked last time:** Visible Abs, May 24 – Jul 18 (the Server's cut window). The food, activity, pace, DEXA and lifts lines are marked SIMULATED.
+  2. **What's different now:** current body fat and progress kept; maintenance with its range (marked illustrative, or "not calibrated yet"); usual activity.
+  3. **So the plan:** eat and move targets; the daily gap and expected rate; plain comparisons with the last cut; one line on calibration over time.
+- **Removed from the default page:** the digestion card, the bottom-up walkthrough, the naive "RMR + activity − food" sum and the gap speculation. **"See calculation details"** (`whyDetails`) shows the maintenance used, its range, the eat and activity formulas, resting energy with its source, and a one-line note that a formula estimate is higher and the plan follows your results.
+- **History module:** `simulator/personal-history.js` tags every value as either `record` (goal name and dates) or `sim` (all outcome numbers). Scenarios B and C have no earlier cut, so the page says so. A food average logged on fewer than 70% of days is labelled rough.
+- **Source audit:** `source-audit/previous-cut-evidence-audit.md`.
+- **Tests:** personal history 11/11; end-to-end 120/120; energy 25/25 and guardrail 32/32, both unchanged.

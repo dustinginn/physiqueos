@@ -437,28 +437,40 @@ SCREENS.energy = () => { const d = S.draft; const e = energyFrom(d.plan.balance,
     ${pm.source === 'provisional' ? `<div class="ewarn amber">${I.warn}<span>This is a starting estimate, not calibrated from your results yet. Targets will be checked against your weight trend after about 3 weeks of logging.</span></div>` : ''}
     ${e.limited ? `<div class="ewarn red">${I.warn}<span>Eating is held at ${fmt(e.floor)} (provisional floor). Add activity or choose a smaller deficit.</span></div>` : ''}
     ${e.eat >= pm.value && e.added > 0 && e.balance < 0 ? `<div class="ewarn amber">${I.warn}<span>You’d eat at or above maintenance and rely on extra activity for the whole deficit.</span></div>` : ''}
-    <span class="t-sm semi" style="color:var(--teal)" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</span>
+    <span class="t-sm semi" style="color:var(--teal)" data-act="go" data-arg="why" role="button" tabindex="0">Why this plan?</span>
   </div>`; };
 
-SCREENS.why = () => { const p = S.draft ? S.draft.plan : S.plan; const r = reconciliation(S.E, p); const E = S.E; const act = hasActivity(); const src = RMR_SOURCES[E.rmrSource].label;
-  return `${statusBar()}${sNav('Back', 'Why these numbers?')}
+// "Why this plan?": personal history first, then what's different now, then the targets.
+// Calculation provenance stays one tap away (S.whyDetails) and is never removed.
+SCREENS.why = () => { const p = S.draft ? S.draft.plan : S.plan; const r = reconciliation(S.E, p); const E = S.E; const act = hasActivity();
+  const cut = r.balance < 0; const h = cut ? cutHistory(E.key) : null; const pm = r.planning; const cal = pm.source === 'calibrated';
+  const li = (t) => `<li>${t}</li>`;
+  const pace = paceVsLast(r.balance, h), eatCmp = intakeVsLast(p.eat, h), actCmp = activityVsLast(p.goal, h);
+  const history = !cut ? '' : h
+    ? `<div class="card"><div class="row between"><span class="eyebrow">What worked last time</span>${simTag}</div>
+        <div class="t-body strong" style="margin-top:6px">${h.goal.value} · ${h.dates.value}</div>
+        <ul class="why">${li(`You ate about <b>${fmt(h.intake.value)}</b> a day${intakeIsRough(h) ? ` (logged on ${Math.round(h.intake.coverage * 100)}% of days, so treat it as rough)` : ''}${act ? ` and averaged about <b>${fmt(h.activity.value)}</b> active calories` : ''}.`)}${li(`You lost about <b>${f1(h.rate.value)} lb a week</b>.`)}${li(`DEXA showed lean mass ${h.lean.value}, and your lifts ${h.strength.value}.`)}</ul>
+        <p class="t-xs muted" style="margin-top:8px">The goal and dates are from your goal history. The numbers are illustrative here; the app would read them from that cut’s logged food, activity, weigh-ins and DEXA scans.</p></div>`
+    : `<div class="card"><span class="eyebrow">Your history</span><p class="t-sm" style="margin-top:6px">No earlier cut on record yet, so this plan starts from an estimate and learns from your results.</p></div>`;
+  const now = `<div class="card"><div class="row between"><span class="eyebrow">What’s different now</span>${simTag}</div>
+    <ul class="why">${li(`You’re at <b>${f1(bf())}%</b> body fat after building, with ${f1(S.gained)} of 10 lb of progress kept.`)}${li(cal ? `Your recent food and weight trend put maintenance near <b>${fmt(pm.value)}</b> a day (likely ${fmt(pm.low)}–${fmt(pm.high)}${E.key === 'A' && !E.recalibrated ? ', illustrative' : ''}).` : `Maintenance isn’t calibrated yet. The starting estimate is <b>${fmt(pm.value)}</b> a day and could be off by a few hundred.`)}${act ? li(`Your usual activity is about <b>${fmt(E.usual)}</b> a day.`) : li('No activity data, so activity is folded into the estimate.')}</ul></div>`;
+  const plan = `<div class="card" style="border:1.5px solid var(--teal)"><span class="eyebrow">So the plan</span>
+    <div class="display h2" style="margin-top:6px">Eat ${fmt(p.eat)}${act ? ` · move ${fmtG(p.goal)}` : ''}</div>
+    <ul class="why">${li(`A daily ${r.balance < 0 ? 'gap' : 'surplus'} of about <b>${fmt(Math.abs(r.balance))}</b>: ${rateRange(r.balance)}${pace ? `, ${pace}` : ''}.`)}${eatCmp ? li(`That’s ${eatCmp}${act && p.added ? `, with ${fmt(p.added)} more activity doing part of the work` : ''}.`) : ''}${act ? li(`Activity goal: your usual ${fmt(E.usual)}${p.added ? ` plus ${fmt(p.added)}` : ''}${actCmp ? `, ${actCmp}` : ''}.`) : ''}</ul>
+    <p class="t-xs muted" style="margin-top:6px">Targets are calibrated over time. Each week your weight and logged food are compared with this plan; if they drift for three weeks you’ll get a small change to approve.</p></div>`;
+  const details = S.whyDetails ? `<div class="card soft">
+      <div class="kv"><span class="k">Maintenance used</span><span class="v">${maintLabel()}</span></div>
+      <div class="kv"><span class="k">Range</span><span class="v">${fmt(pm.low)}–${fmt(pm.high)}</span></div>
+      <div class="kv"><span class="k">Eat</span><span class="v">${fmt(pm.value)} ${r.balance < 0 ? '−' : '+'} ${fmt(Math.abs(r.balance))}${act ? ` + ${fmt(p.added || 0)} extra` : ''} = ${fmt(p.eat)}</span></div>
+      ${act ? `<div class="kv"><span class="k">Activity goal</span><span class="v">${fmt(E.usual)} usual + ${fmt(p.added || 0)} extra = ${fmtG(p.goal)}</span></div>` : ''}
+      <div class="kv"><span class="k">Resting energy</span><span class="v">≈ ${fmt(E.rmr)} · ${RMR_SOURCES[E.rmrSource].label}</span></div>
+      <p class="t-xs muted" style="margin-top:6px">${cal ? `A formula estimate from resting energy and activity is ≈ ${fmt(r.bottomUp.value)}. Your results point lower, so the plan follows your results.` : `Starting estimate = ${act ? `(resting ${fmt(E.rmr)} + activity ${fmt(E.usual)}) with digestion` : `resting ${fmt(E.rmr)} × ${E.factor}`}, range ${fmt(pm.low)}–${fmt(pm.high)}. ${pm.note || ''}`}</p></div>` : '';
+  return `${statusBar()}${sNav('Back', 'Why this plan?')}
   <div class="content stack">
-    <p class="lead">How eating ${fmt(p.eat)}${act ? ` and an activity goal of ${fmtG(p.goal)}` : ''} were worked out. All values are simulated. ${simTag}</p>
-    <div class="layer"><div class="row between"><span class="t-sm strong">1 · Resting energy (RMR)</span><span class="prov e">${src}</span></div><div class="t-body strong" style="margin-top:4px">≈ ${fmt(E.rmr)} kcal/day</div><p class="t-xs muted">An estimate unless measured. It changes as body composition changes.</p></div>
-    <div class="layer"><div class="row between"><span class="t-sm strong">2 · Usual activity</span><span class="prov">${act ? 'Apple Health, last 4 weeks' : 'No activity data'}</span></div><div class="t-body strong" style="margin-top:4px">${act ? `≈ ${fmt(E.usual)} kcal/day, workouts included` : `Assumed activity level × ${E.factor}`}</div></div>
-    <div class="layer"><div class="row between"><span class="t-sm strong">3 · Digestion</span><span class="prov">Assumption</span></div><div class="t-body strong" style="margin-top:4px">≈ ${E.tefPct}% of intake${act ? ` (≈ ${fmt(r.tef)})` : ' (inside the activity factor)'}</div></div>
-    <div class="layer"><div class="row between"><span class="t-sm strong">4 · Estimate from these parts</span><span class="prov">Bottom-up</span></div><div class="t-body strong" style="margin-top:4px">≈ ${fmt(r.bottomUp.value)} (${fmt(r.bottomUp.low)}–${fmt(r.bottomUp.high)}) at usual activity</div><p class="t-xs muted">${act ? `(${fmt(E.rmr)} + ${fmt(E.usual)}) ÷ (1 − ${E.tefPct}%)` : `${fmt(E.rmr)} × ${E.factor}`}</p></div>
-    <div class="layer" style="${r.planning.source === 'calibrated' ? 'border-color:var(--teal)' : ''}"><div class="row between"><span class="t-sm strong">5 · Maintenance from your results</span><span class="prov ${r.planning.source === 'calibrated' ? 'm' : ''}">${r.planning.source === 'calibrated' ? 'Calibrated' : 'Not available yet'}</span></div>
-      <div class="t-body strong" style="margin-top:4px">${r.planning.source === 'calibrated' ? `≈ ${fmt(r.planning.value)} (${fmt(r.planning.low)}–${fmt(r.planning.high)}) logged kcal/day` : '—'}</div><p class="t-xs muted">${r.planning.note || ''}</p></div>
-    <div class="card" style="border:1.5px solid var(--teal)"><span class="eyebrow">What the plan uses</span>
-      <div class="kv"><span class="k">Maintenance</span><span class="v">${maintLabel()}</span></div>
-      <div class="kv"><span class="k">Planned daily balance</span><span class="v">${sgn(r.balance)}</span></div>
-      <div class="kv"><span class="k">Eat</span><span class="v">${fmt(r.planning.value)} ${r.balance < 0 ? '−' : '+'} ${fmt(Math.abs(r.balance))}${act ? ` + ${fmt(p.added || 0)} extra` : ''} = ${fmt(p.eat)}</span></div>
-      ${act ? `<div class="kv"><span class="k">Activity goal</span><span class="v">${fmt(E.usual)} usual + ${fmt(p.added || 0)} extra = ${fmtG(p.goal)}</span></div>` : ''}</div>
-    ${act ? `<div class="card soft"><span class="eyebrow">Why it isn’t RMR + activity − food</span>
-      <div class="kv"><span class="k">RMR + activity goal − eat</span><span class="v">${fmt(E.rmr)} + ${fmtG(p.goal)} − ${fmt(p.eat)} = ${fmt(r.naive)}</span></div>
-      <div class="kv"><span class="k">With digestion added</span><span class="v">≈ ${fmt(-r.bottomUpDiff)}</span></div>
-      <p class="t-xs muted" style="margin-top:6px">That simple sum is not your deficit. ${r.planning.source === 'calibrated' ? `Your results behave like maintenance ≈ ${fmt(r.planning.value)}, about ${fmt(Math.abs(r.gap))} ${r.gap > 0 ? 'below' : 'above'} the bottom-up estimate. The gap usually comes from under-logged food, wearable over-estimates and RMR estimate error. The plan follows your results and still shows both.` : 'Until your results calibrate it, the plan starts from the bottom-up estimate with a wide range.'}</p></div>` : ''}
+    <p class="lead">${cut ? (h ? 'Built from how your body responded last time, then adjusted for where you are now.' : 'Built from where you are now, then adjusted as your results come in.') : 'Built from your current maintenance, then adjusted as your results come in.'}</p>
+    ${history}${now}${plan}
+    <div class="t-sm semi" style="color:var(--teal)" data-act="whyDetails" role="button" tabindex="0" aria-expanded="${!!S.whyDetails}">${S.whyDetails ? 'Hide calculation details' : 'See calculation details'}</div>
+    ${details}
   </div>`; };
 
 const hubRow = (ic, name, detail, act, changed) => `<div class="srow ${changed ? 'chg' : ''}" data-act="${act}" role="button" tabindex="0"><span class="ic ${changed ? 'amber' : ''}">${ic}</span><div class="grow"><div class="nm">${name}</div><div class="dt">${detail}</div></div><span class="edit">Edit</span></div>`;
@@ -538,7 +550,7 @@ SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const 
   <span class="pill teal" style="align-self:flex-start">${I.check} Checked against your latest evidence ${simTag}</span>
   <div class="card diff">${rows.length ? rows.map(([k, was, now]) => `<div class="kv"><span class="k">${k}</span><span class="delta">${was ? `<s>${was}</s>` : ''}<span class="v">${now}</span></span></div>`).join('') : '<p class="t-sm ink2">No changes yet.</p>'}</div>
   <div class="card soft" style="padding:10px 14px"><div class="t-xs muted">Eat = maintenance ${maintLabel()} ${p.balance < 0 ? '−' : '+'} ${fmt(Math.abs(p.balance))}${hasActivity() ? ` + ${fmt(p.added || 0)} extra activity` : ''} = <b style="color:var(--ink)">${fmt(p.eat)}</b>${hasActivity() ? ` · activity goal = ${fmt(S.E.usual)} usual + ${fmt(p.added || 0)} = ${fmtG(p.goal)}` : ''}</div>
-    <div class="t-sm semi" style="color:var(--teal);margin-top:6px" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</div></div>
+    <div class="t-sm semi" style="color:var(--teal);margin-top:6px" data-act="go" data-arg="why" role="button" tabindex="0">Why this plan?</div></div>
   <p class="t-xs muted">Only numbers that change are listed. Everything else carries forward.</p>
   ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}${fixes(d)}
   ${btn('Approve', rows.length && draftCheck(d).ok ? 'approve' : 'noop', rows.length && draftCheck(d).ok ? 'primary' : 'disabled')}
@@ -636,6 +648,7 @@ const ACT = {
   targetAuto: () => { S.draft.targetMode = 'auto'; S.draft.target = null; render(); },
   grMode: (a) => { const d = S.draft; d.gr.mode = a; if (a === 'keep') { const b = draftBase(d); const e = grEffective(b.goal, b.phase); if (e.enabled !== false) Object.assign(d.gr, { min: e.min, max: e.max }); } render(); },
   grScope: (a) => { S.draft.gr.scope = a; render(); },
+  whyDetails: () => { S.whyDetails = !S.whyDetails; render(); },
   openGuardrail: () => { const d = S.draft; S.grSnap = JSON.stringify({ gr: d.gr, targetMode: d.targetMode, target: d.target }); go('guardrail'); },
   target: (a) => { const d = S.draft; d.target = Math.max(GR_LIMITS.min, Math.min(15, tgt(d) + Number(a))); d.targetMode = 'custom'; render(); },
   date: (a) => { S.draft.goalDate = a; render(); },

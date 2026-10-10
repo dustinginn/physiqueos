@@ -3,7 +3,7 @@ import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath }
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const r = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
 const css = r('phone.css') + '\n' + r('components.css');
-const js = [r('chrome.js'), r('energy-model.js'), r('guardrail-model.js'), r('../home/home-render.js'), r('sim.js')].join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
+const js = [r('chrome.js'), r('energy-model.js'), r('guardrail-model.js'), r('personal-history.js'), r('../home/home-render.js'), r('sim.js')].join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
 const html = `<title>Goal Adaptation Simulator</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
 <style>

@@ -80,22 +80,52 @@
     "info": ""
   },
   {
-    "name": "Why: RMR 1,850 DEXA report estimate",
+    "name": "energy screen links to \"Why this plan?\"",
     "pass": true,
     "info": ""
   },
   {
-    "name": "Why: naive 1,850 + 900 − 1,717 = 1,033 labelled not a deficit",
+    "name": "Why this plan?: title + personal history first (Visible Abs, May 24 – Jul 18)",
     "pass": true,
     "info": ""
   },
   {
-    "name": "Why: bottom-up 2,944 vs calibrated 2,117, gap explained",
+    "name": "history numbers marked simulated + provenance note",
     "pass": true,
     "info": ""
   },
   {
-    "name": "Why: plan arithmetic 2,117 − 500 + 100 = 1,717 and 800 + 100 = 900",
+    "name": "what’s different now: 9.7%, maintenance 2,117 (1,977–2,258, illustrative), usual 800",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "plan: eat 1,717 · move 900; gap 500; coach comparisons; calibrated over time",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "default page has no digestion, bottom-up walkthrough, naive sum or gap speculation",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "details hidden by default",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "details: maintenance 2,117 (calibrated, illustrative), range, 2,117 − 500 + 100 extra = 1,717, 800 usual + 100 extra = 900",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "details: resting 1,850 DEXA report estimate; formula ≈ 2,944, plan follows results (no speculation)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "details collapse again",
     "pass": true,
     "info": ""
   },
@@ -475,6 +505,16 @@
     "info": ""
   },
   {
+    "name": "B Why: no earlier cut, uncalibrated starting estimate 2,926 stated honestly",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "B Why details: provisional maintenance + range",
+    "pass": true,
+    "info": ""
+  },
+  {
     "name": "B: real maintenance lower than provisional → Quick Calibration offered",
     "pass": true,
     "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":2576,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.92804556743812,\"gained\":7.6292,\"qc\":true,\"stack\":0}"
@@ -506,6 +546,11 @@
   },
   {
     "name": "C: Move more / Blend hidden, activity explained",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "C Why: no activity goal, no history, activity folded into estimate",
     "pass": true,
     "info": ""
   },
@@ -543,5 +588,15 @@
     "name": "mobile no errors",
     "pass": true,
     "info": ""
+  },
+  {
+    "name": "mobile 390: Why this plan? has no horizontal overflow",
+    "pass": true,
+    "info": "[0,0]"
+  },
+  {
+    "name": "Why this plan? is short (≤ 1.6 screens of content)",
+    "pass": true,
+    "info": "1001"
   }
 ]
