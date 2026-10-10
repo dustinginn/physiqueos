@@ -3,73 +3,142 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
 <style>
-
-/* Layout: a review board — decision first, then the journey in order; phones sit in their own horizontal scrollers so the page never scrolls sideways. */
+/* Layout: a desktop review wrapper — sticky category bar, one row per screen (notes | Dark | Mineral Light),
+   a dedicated A/B decision stage, and a lightbox. Phones keep their authentic 402 pt geometry and are scaled with zoom to fit their column. */
 :root {
-  --bg: #E8ECE5; --surface: #FBFAF4; --fg: #102431; --fg2: #526970; --muted: #5D7279;
-  --accent: #087E78; --accentWash: rgba(8,126,120,.09); --warn: #925500; --line: rgba(25,56,66,.17);
-  --good: #16875F;
+  --bg: #E8ECE5; --surface: #FBFAF4; --raised: #F3F5F0; --fg: #102431; --fg2: #526970; --muted: #5D7279;
+  --accent: #087E78; --accentWash: rgba(8,126,120,.09); --warn: #925500; --line: rgba(25,56,66,.17); --good: #16875F;
+  --overlay: rgba(16,36,49,.72); --barBg: rgba(232,236,229,.92);
   --display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #061019; --surface: #0F1C2A; --fg: #F3F8FA; --fg2: #C3D2D9; --muted: #92A5AF;
-  --accent: #3BD2CA; --accentWash: rgba(59,210,202,.10); --warn: #EFB84F; --line: rgba(157,179,189,.2); --good: #55E39A; color-scheme: dark } }
+  --bg: #061019; --surface: #0F1C2A; --raised: #0B1722; --fg: #F3F8FA; --fg2: #C3D2D9; --muted: #92A5AF;
+  --accent: #3BD2CA; --accentWash: rgba(59,210,202,.10); --warn: #EFB84F; --line: rgba(157,179,189,.2); --good: #55E39A;
+  --overlay: rgba(2,8,14,.86); --barBg: rgba(6,16,25,.9); color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #061019; --surface: #0F1C2A; --fg: #F3F8FA; --fg2: #C3D2D9; --muted: #92A5AF;
-  --accent: #3BD2CA; --accentWash: rgba(59,210,202,.10); --warn: #EFB84F; --line: rgba(157,179,189,.2); --good: #55E39A; color-scheme: dark }
+  --bg: #061019; --surface: #0F1C2A; --raised: #0B1722; --fg: #F3F8FA; --fg2: #C3D2D9; --muted: #92A5AF;
+  --accent: #3BD2CA; --accentWash: rgba(59,210,202,.10); --warn: #EFB84F; --line: rgba(157,179,189,.2); --good: #55E39A;
+  --overlay: rgba(2,8,14,.86); --barBg: rgba(6,16,25,.9); color-scheme: dark }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 1760px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+.wrap { max-width: 1720px; margin: 0 auto; padding-inline: clamp(16px, 2.6vw, 44px); padding-block: 0 72px; }
 .kick { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.wrap h1 { font-family: var(--display); font-size: clamp(30px, 5vw, 46px); line-height: 1.05; letter-spacing: -.03em; margin: 8px 0 10px; text-wrap: balance; }
-.lead { color: var(--fg2); font-size: 16px; line-height: 1.55; max-width: 68ch; margin: 0; }
-.status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; color: var(--fg2); background: var(--surface); }
+header.top { padding-block: 32px 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 40px; align-items: end; }
+header.top h1 { font-family: var(--display); font-size: clamp(30px, 3.6vw, 52px); line-height: 1.04; letter-spacing: -.03em; margin: 8px 0 12px; text-wrap: balance; }
+.lead { color: var(--fg2); font-size: 17px; line-height: 1.55; max-width: 74ch; margin: 0; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; max-width: 460px; }
+.chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--fg2); background: var(--surface); }
 .chip.warn { color: var(--warn); }
-.toolbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 22px; padding-block: 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.toolbar nav { display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.toolbar nav a { color: var(--accent); font-weight: 600; font-size: 14px; text-decoration: none; padding: 4px 0; }
-.toolbar nav a:hover, .toolbar nav a:focus-visible { text-decoration: underline; }
-.themes { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; background: var(--surface); margin-left: auto; }
-.themes button { font: 600 13px var(--body); color: var(--fg2); background: transparent; border: 0; border-radius: 9px; padding: 8px 12px; cursor: pointer; min-height: 36px; }
-.themes button[aria-pressed="true"] { background: var(--accentWash); color: var(--accent); }
-.themes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.section { padding-block: 34px 10px; border-bottom: 1px solid var(--line); }
-.section h2 { font-family: var(--display); font-size: clamp(22px, 3vw, 28px); letter-spacing: -.02em; margin: 0 0 6px; text-wrap: balance; }
-.section h3.group { font-family: var(--display); font-size: 15px; letter-spacing: .02em; color: var(--muted); margin: 26px 0 4px; text-transform: uppercase; }
-.section .note { color: var(--fg2); font-size: 14.5px; line-height: 1.55; max-width: 80ch; margin: 0 0 18px; }
-.pairs { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
-.shot { min-width: 0; max-width: 100%; }
-.scroller { max-width: 100%; overflow-x: auto; padding: 4px 4px 22px; }
-.cap { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.only-dark .shot.light, .only-light .shot.dark { display: none; }
-.compare { overflow-x: auto; margin-top: 18px; }
-.compare table, .facts table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.45; min-width: 560px; }
-.compare th, .compare td, .facts th, .facts td { text-align: left; vertical-align: top; padding: 9px 12px 9px 0; border-top: 1px solid var(--line); }
-.compare th, .facts th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.compare td:first-child { color: var(--fg2); font-weight: 600; width: 180px; }
-.rec { margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--accentWash); border: 1px solid var(--line); max-width: 80ch; font-size: 14.5px; line-height: 1.55; }
-.rec b { color: var(--accent); }
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 24px; }
+
+/* sticky bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--barBg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-block: 1px solid var(--line); margin-inline: calc(-1 * clamp(16px, 2.6vw, 44px)); padding: 10px clamp(16px, 2.6vw, 44px); display: flex; gap: 10px 18px; align-items: center; flex-wrap: wrap; }
+.topbar nav { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.topbar nav a { color: var(--fg2); font-weight: 600; font-size: 14px; text-decoration: none; padding: 7px 9px; border-radius: 10px; white-space: nowrap; }
+.topbar nav a:hover { color: var(--fg); background: var(--accentWash); }
+.topbar nav a[aria-current="true"] { color: var(--accent); background: var(--accentWash); }
+.topbar nav a:focus-visible, .tog button:focus-visible, .phone-btn:focus-visible, .lb button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tog { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; background: var(--surface); flex: none; }
+.tog button { font: 600 13px var(--body); color: var(--fg2); background: transparent; border: 0; border-radius: 9px; padding: 8px 12px; cursor: pointer; min-height: 36px; white-space: nowrap; }
+.tog button[aria-pressed="true"] { background: var(--accentWash); color: var(--accent); }
+.tog-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+
+/* sections */
+.section { padding-block: 44px 8px; scroll-margin-top: 76px; }
+.section > .sh { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 22px; }
+.section h2 { font-family: var(--display); font-size: clamp(24px, 2.2vw, 32px); letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.section .sub { color: var(--fg2); font-size: 15px; line-height: 1.5; margin: 0; max-width: 90ch; }
+
+/* screen rows: notes | Dark | Mineral */
+.screens { display: flex; flex-direction: column; gap: 34px; }
+.screen { display: grid; grid-template-columns: minmax(240px, 300px) repeat(2, minmax(0, 1fr)); gap: 28px; align-items: start; }
+.notes { position: sticky; top: 84px; padding-top: 6px; }
+.notes .num { font-family: var(--display); font-weight: 800; color: var(--accent); font-size: 14px; letter-spacing: .04em; }
+.notes h3 { font-family: var(--display); font-size: 21px; line-height: 1.2; letter-spacing: -.015em; margin: 6px 0 10px; text-wrap: balance; }
+.notes p { color: var(--fg2); font-size: 15px; line-height: 1.55; margin: 0; }
+.notes .hint { margin-top: 12px; font-size: 13px; color: var(--muted); }
+.cell { min-width: 0; }
+.cap { margin: 0 0 10px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.phone-btn { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 48px; text-align: left; color: inherit; font: inherit; }
+.phone-btn .phone { pointer-events: none; }
+.phone-btn:hover .phone { box-shadow: 0 0 0 3px var(--accent), 0 18px 40px rgba(0,0,0,.3); }
+/* single-theme mode: grid of cards (notes above one phone) */
+.mode-dark .cell.light, .mode-light .cell.dark { display: none; }
+.mode-dark .screens, .mode-light .screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 40px 28px; }
+.mode-dark .screen, .mode-light .screen { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.mode-dark .notes, .mode-light .notes { position: static; }
+
+/* A/B decision stage */
+.decision-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; margin-bottom: 26px; }
+.compare { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 8px 18px 10px; }
+.compare table { border-collapse: collapse; width: 100%; font-size: 15px; line-height: 1.45; min-width: 520px; }
+.compare th, .compare td { text-align: left; vertical-align: top; padding: 11px 14px 11px 0; border-top: 1px solid var(--line); }
+.compare tr:first-child th { border-top: 0; font-family: var(--display); font-size: 16px; color: var(--fg); }
+.compare td:first-child { color: var(--muted); font-weight: 600; width: 170px; }
+.rec { padding: 18px 20px; border-radius: 18px; background: var(--accentWash); border: 1px solid var(--line); font-size: 16px; line-height: 1.55; }
+.rec b { color: var(--accent); font-family: var(--display); font-size: 18px; display: block; margin-bottom: 6px; }
+.rec .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.ab { display: grid; gap: 30px; }
+.abhead, .abgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
+.abrow > .cap { font-size: 12px; color: var(--fg2); border-top: 1px solid var(--line); padding-top: 14px; margin-bottom: 14px; }
+.mode-dark .abrow.light, .mode-light .abrow.dark { display: none; }
+.ab .colhead { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.01em; margin: 0 0 4px; }
+.ab .colhead span { color: var(--accent); }
+.ab .colsub { color: var(--fg2); font-size: 14.5px; margin: 0 0 14px; }
+.ab[data-size="normal"] .v-xl, .ab[data-size="xl"] .v-normal { display: none; }
+
+/* misc */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 28px; }
 .facts > div { overflow-x: auto; min-width: 0; }
+.facts table { border-collapse: collapse; width: 100%; font-size: 14.5px; line-height: 1.45; min-width: 520px; }
+.facts th, .facts td { text-align: left; vertical-align: top; padding: 9px 12px 9px 0; border-top: 1px solid var(--line); color: var(--fg); }
+.facts th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .facts td.tag-exact { color: var(--good); font-weight: 700; }
 .facts td.tag-ill { color: var(--warn); font-weight: 700; }
-.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13.5px; }
-.flow .n { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; color: var(--fg); }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14.5px; }
+.flow .n { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; color: var(--fg); }
 .flow .n b { color: var(--accent); margin-right: 6px; }
 .flow .a { color: var(--muted); }
-.questions { margin: 0; padding-left: 22px; max-width: 84ch; display: grid; gap: 8px; font-size: 14.5px; line-height: 1.5; color: var(--fg2); }
+.flow-note { color: var(--fg2); font-size: 15px; margin: 14px 0 0; }
+.questions { margin: 0; padding-left: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 12px 40px; font-size: 15.5px; line-height: 1.5; color: var(--fg2); }
 .questions b { color: var(--fg); }
-.links { display: grid; gap: 6px; font-size: 14px; }
+.links { display: grid; gap: 8px; font-size: 15px; }
 .links a { color: var(--accent); overflow-wrap: anywhere; }
-.links code { font-size: 12.5px; color: var(--fg2); overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.links code { font-size: 13px; color: var(--fg2); overflow-wrap: anywhere; }
+
+/* lightbox */
+.lb { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.lb[hidden] { display: none !important; }
+.lb-bar { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.lb-title { font-family: var(--display); font-weight: 800; font-size: 17px; flex: 1; min-width: 180px; }
+.lb-title small { display: block; font-family: var(--body); font-weight: 500; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.lb button.icon { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: var(--fg); font-size: 18px; cursor: pointer; }
+.lb-stage { overflow: auto; display: flex; justify-content: center; padding: 28px 20px 60px; }
+.lb-stage .phone { flex: none; }
+.lb-help { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 1100px) {
+  header.top { grid-template-columns: minmax(0, 1fr); }
+  .status { justify-content: flex-start; }
+  .decision-top { grid-template-columns: minmax(0, 1fr); }
+  .screen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .notes { grid-column: 1 / -1; position: static; }
+}
+@media (min-width: 701px) { .mobile-only { display: none; } }
+@media (max-width: 700px) {
+  .screen, .abhead, .abgrid { grid-template-columns: minmax(0, 1fr); }
+  .abhead { display: none; }
+  .topbar { flex-direction: column; align-items: stretch; }
+  .topbar nav { flex-wrap: nowrap; overflow-x: auto; flex: none; width: 100%; max-width: 100%; }
+  #theme-filter { align-self: flex-start; }
+  .lb-help { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 
 
 
 /* ---------- Accepted PhysiqueOS redesign tokens (ios/PhysiqueOS/SharedUI/PhysiqueOSTheme.swift @ 9d0a2069) ---------- */
-/* Phone frames always render one fixed PhysiqueOS theme each (Dark or Mineral Light), independent of the page theme. */
+/* Phone frames each render one fixed PhysiqueOS theme (Dark or Mineral Light), independent of the page theme. */
 .phone {
   color-scheme: dark;
   --canvas: #061019; --paper: #0F1C2A; --soft: #132334;
@@ -99,7 +168,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--body); -webki
   position: relative; width: 402px; min-height: 874px;
   background: var(--canvas); color: var(--ink);
   border-radius: 48px; overflow: hidden; box-shadow: var(--shadow);
-  font-size: 16px; padding-bottom: 40px; isolation: isolate; font-family: var(--body); flex: none;
+  font-size: 16px; padding-bottom: 40px; isolation: isolate; font-family: var(--body); text-align: left;
 }
 .phone.xl { font-size: 21.6px; } /* 135% Dynamic Type stress */
 .t-xs { font-size: .75em; line-height: 1.3; }
@@ -233,56 +302,35 @@ p { margin: 0; }
 
 
 </style>
-<div class="wrap" id="board">
-  <div class="kick">PhysiqueOS · Goal Adaptation · design review · not implemented</div>
-  <h1>Goal Adaptation Board</h1>
-  <p class="lead">Mobile mockups of how PhysiqueOS would help you adapt Build Lean Mass after the October 9 DEXA: about 71% of +10 lb, 22 days to Oct 31, body fat above your 8–9% range, Goal Confidence 70% (from 80). Every screen is shown in Dark and Mineral Light using the accepted PhysiqueOS design tokens.</p>
-  <div class="status"><span class="chip warn">Awaiting your decision: A, B or hybrid</span><span class="chip">Design only · nothing built</span><span class="chip">Calorie values are placeholders</span></div>
-  <div class="toolbar">
-    <nav aria-label="Sections"><a href="#decision">Decision screen</a><a href="#triggers">Triggers &amp; Home</a><a href="#paths">Choose &amp; approve</a><a href="#after">After approval</a><a href="#facts">Facts</a><a href="#questions">Open questions</a></nav>
-    <div class="themes" role="group" aria-label="Show appearance"><button type="button" data-show="both" aria-pressed="true">Both</button><button type="button" data-show="dark" aria-pressed="false">Dark</button><button type="button" data-show="light" aria-pressed="false">Mineral Light</button></div>
-  </div>
-
-  <section class="section" id="decision">
-    <h2>Your decision: the main decision screen</h2>
-    <p class="note">Two layouts for the moment you choose what to protect next. Both are shown at normal and 135% text size.</p>
-    <div class="compare"><table>
-      <tr><th></th><th>A · Ranked choice cards</th><th>B · Side-by-side comparison</th></tr>
-      <tr><td>Best at</td><td>One clear decision on a phone; each option says what it protects and what it costs</td><td>Seeing every tradeoff at once</td></tr>
-      <tr><td>Choices inside a choice</td><td>A card opens its own choices</td><td>Needs a second screen</td></tr>
-      <tr><td>Large text (135%)</td><td>Reflows cleanly</td><td>Columns about 95 pt wide; cells wrap to 3–4 lines</td></tr>
-      <tr><td>VoiceOver</td><td>One card at a time, in order</td><td>Reading order has to be set cell by cell</td></tr>
-      <tr><td>Build effort</td><td>Low: existing cards, rails and pills</td><td>Medium: a new comparison grid</td></tr>
-    </table></div>
-    <div class="rec"><b>Recommendation: A.</b> Optionally add B as a read-only “Compare side by side” sheet opened from A (the hybrid).</div>
-  </section>
-
-  <section class="section" id="journey"><h2>The journey</h2></section>
-  <section class="section" id="triggers"><h2>Where the recommendation appears</h2><p class="note">One recommendation, shown in the briefing, on Home, in one notification, and again only inside the next Weekly if still open.</p></section>
-  <section class="section" id="paths"><h2>Choose, configure and approve</h2><p class="note">Conflicting choices are blocked with a plain explanation. Each path is configured on one screen, then everything is approved once.</p></section>
-  <section class="section" id="after"><h2>After approval</h2><p class="note">Nothing restarts automatically, and goal options stay closed until a new plan has had a fair test.</p></section>
-  <section class="section" id="facts"><h2>Facts vs illustrative values</h2><p class="note">Real values come from production records and earlier reports. Calorie ranges, outcome ranges, example dates and the future scan are placeholders.</p><div class="facts" id="facts-grid"></div></section>
-  <section class="section" id="questions"><h2>Open questions</h2>
-    <ol class="questions">
-      <li><b>Decision screen:</b> A, B, or hybrid (A with B as a read-only sheet)? Recommended: A or the hybrid.</li>
-      <li><b>Leaning phase:</b> a step inside Build Lean Mass (as shown) or a separate temporary goal?</li>
-      <li><b>How it ends by default:</b> back in 8–9% on a DEXA, or also capped at a maximum length?</li>
-      <li><b>“Keep my current plan”:</b> quiet until the next DEXA only, or also reopen on a clear trend change?</li>
-      <li><b>“Remind me”:</b> only inside the Weekly (as shown), or one reminder notification too?</li>
-      <li><b>DEXA briefings as a trigger</b> for other users: keep them eligible, or start only from Weekly and Monthly?</li>
-      <li><b>Waiting period after a new phase:</b> 21 days plus the next DEXA, or shorter or longer?</li>
-      <li><b>Calories in the review:</b> how big a change is worth showing?</li>
-      <li><b>Below 8% while gaining:</b> acceptable, or also outside your range?</li>
-      <li><b>Goal history:</b> its own screen in Goals, or only inside the goal?</li>
-    </ol>
-  </section>
-  <section class="section" id="source"><h2>On GitHub</h2>
-    <div class="links">
-      <span>Full report on <code>main</code>: <code>agent-handoffs/reports/20261010T033524Z-goal-adaptation-founder-scenario-design-mockups.md</code></span>
-      <a href="https://github.com/dustinginn/physiqueos/commit/3682ff19340fd685fd28ba28eb482bd588f55516">Every screenshot on GitHub (design branch commit 3682ff19)</a>
-      <a href="https://github.com/dustinginn/physiqueos/compare/main...claude/goal-adaptation-design-mockups-20261010">Design branch compared with main</a>
+<div class="wrap mode-both" id="board">
+  <header class="top">
+    <div>
+      <div class="kick">PhysiqueOS · Goal Adaptation · design review · not implemented</div>
+      <h1>Goal Adaptation Board</h1>
+      <p class="lead">How PhysiqueOS would help you adapt Build Lean Mass after the October 9 DEXA: about 71% of +10 lb, 22 days to Oct 31, body fat above your 8–9% range, Goal Confidence 70% (from 80). Every screen is an authentic 402 pt iPhone layout using the accepted PhysiqueOS tokens. Click any screen to enlarge it.</p>
     </div>
-  </section>
+    <div class="status"><span class="chip warn">Awaiting your decision: A, B or hybrid</span><span class="chip">Design only · nothing built</span><span class="chip">Calorie values are placeholders</span></div>
+  </header>
+  <div class="topbar">
+    <nav aria-label="Sections" id="nav"></nav>
+    <div class="tog" role="group" aria-label="Show appearance" id="theme-filter">
+      <button type="button" data-mode="both" aria-pressed="true">Both</button><button type="button" data-mode="dark" aria-pressed="false">Dark</button><button type="button" data-mode="light" aria-pressed="false">Mineral Light</button>
+    </div>
+  </div>
+  <main id="sections"></main>
+</div>
+<div class="lb" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lb-title" hidden>
+  <div class="lb-bar">
+    <button type="button" class="icon" id="lb-prev" aria-label="Previous screen">‹</button>
+    <button type="button" class="icon" id="lb-next" aria-label="Next screen">›</button>
+    <div class="lb-title" id="lb-title"></div>
+    <span class="lb-help">← → to move · T to switch theme · Esc to close</span>
+    <div class="tog" role="group" aria-label="Lightbox appearance" id="lb-theme">
+      <button type="button" data-theme="dark" aria-pressed="true">Dark</button><button type="button" data-theme="light" aria-pressed="false">Mineral Light</button>
+    </div>
+    <button type="button" class="icon" id="lb-close" aria-label="Close">✕</button>
+  </div>
+  <div class="lb-stage" id="lb-stage"></div>
 </div>
 <script>
 
@@ -810,24 +858,158 @@ const flow = `<div class="flow">
 <p class="note" style="margin-top:14px">Minimum path: briefing → Review options → Set up leaning phase → Review changes → Approve = <b>4 taps</b> when accepting the recommendation and its suggested settings.</p>`;
 
 
-const shot = (key, theme, extra = '') => `<div class="shot ${theme}"><p class="cap">${theme === 'light' ? 'Mineral Light' : 'Dark'}${extra ? ' · 135% text' : ''}</p>
-  <div class="scroller"><div class="phone ${theme} ${extra}">${S[key]()}</div></div></div>`;
+// ---------------------------------------------------------------------------
+// Review wrapper (presentation only; screens above are the unchanged design source)
+// ---------------------------------------------------------------------------
 const meta = Object.fromEntries(SECTIONS_DATA.map((s) => [s[0], s]));
-const sec = (key, xl = false) => { const [, title, note] = meta[key];
-  return `<h3 class="group">${title}</h3><p class="note">${note}</p><div class="pairs">${shot(key, 'dark')}${shot(key, 'light')}${xl ? shot(key, 'dark', 'xl') + shot(key, 'light', 'xl') : ''}</div>`; };
-document.getElementById('decision').insertAdjacentHTML('beforeend', sec('05-options-alt-a-ranked', true) + sec('06-options-alt-b-compare', true));
-document.getElementById('triggers').insertAdjacentHTML('beforeend', ['01-dexa-recommendation', '02-weekly-plan-check', '03-home-priority', '04-notification', '04b-not-now-sheet'].map((k) => sec(k)).join(''));
-document.getElementById('paths').insertAdjacentHTML('beforeend', ['07-conflict-validation', '08-leaning-phase-setup', '09-keep-building-revision', '10-review-approve'].map((k) => sec(k)).join(''));
-document.getElementById('after').insertAdjacentHTML('beforeend', ['11-phase-started', '12-phase-complete-next', '13-evidence-insufficient'].map((k) => sec(k)).join(''));
-document.getElementById('facts-grid').insertAdjacentHTML('beforeend', factsTable.trim().replace(/^<div class="facts">/, '').replace(/<\/div>$/, '').replace(/<table>/g, '<div><table>').replace(/<\/table>/g, '</table></div>'));
-document.getElementById('journey').insertAdjacentHTML('beforeend', flow);
-const board = document.getElementById('board');
-document.querySelectorAll('.themes button').forEach((btn) => btn.addEventListener('click', () => {
-  document.querySelectorAll('.themes button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
-  board.classList.remove('only-dark', 'only-light');
-  if (btn.dataset.show !== 'both') board.classList.add(`only-${btn.dataset.show}`);
-  try { localStorage.setItem('ga-board-theme', btn.dataset.show); } catch {}
-}));
-try { const saved = localStorage.getItem('ga-board-theme'); if (saved) document.querySelector(`.themes button[data-show="${saved}"]`)?.click(); } catch {}
+const SHORT = {
+  '01-dexa-recommendation': 'DEXA briefing recommendation', '02-weekly-plan-check': 'Weekly briefing reference',
+  '03-home-priority': 'Home priority', '04-notification': 'One notification', '04b-not-now-sheet': '“Not now” choices',
+  '05-options-alt-a-ranked': 'Decision A · ranked cards', '06-options-alt-b-compare': 'Decision B · side by side',
+  '07-conflict-validation': 'Conflict validation', '08-leaning-phase-setup': 'Leaning phase setup',
+  '09-keep-building-revision': 'Keep building: limits and date', '10-review-approve': 'Review and approve',
+  '11-phase-started': 'Phase started', '12-phase-complete-next': 'Phase complete: what next', '13-evidence-insufficient': 'Too early to judge',
+};
+const GROUPS = [
+  ['recommendation', 'Recommendation', 'Where a goal decision starts: a compact card in the briefing, and the same open decision in the Weekly.', ['01-dexa-recommendation', '02-weekly-plan-check']],
+  ['alerts', 'Home & alerts', 'One recommendation shown on Home and in one notification. “Not now” offers three different outcomes.', ['03-home-priority', '04-notification', '04b-not-now-sheet']],
+  ['options', 'Options', 'Choices inside a choice, with conflicting combinations blocked in plain language. (The two main option layouts are in Decision A/B above.)', ['07-conflict-validation']],
+  ['cut', 'Cut setup', 'Temporary leaning phase: how it ends, check-ins, what happens next, and the placeholder energy plan.', ['08-leaning-phase-setup']],
+  ['revision', 'Goal revision', 'Keep building with a revised body-fat limit and date. The original goal is kept in history.', ['09-keep-building-revision']],
+  ['approval', 'Approval & Operating Plan', 'One compact review of what changes in the goal, phase and Operating Plan, approved once.', ['10-review-approve']],
+  ['next', 'Next phase', 'After approval, and later when the phase completes. Nothing restarts automatically.', ['11-phase-started', '12-phase-complete-next']],
+  ['evidence', 'Insufficient evidence', 'Goal options stay closed until a new plan has had a fair test.', ['13-evidence-insufficient']],
+];
+const NAV_LABEL = { approval: 'Approval', evidence: 'Evidence' };
+const NAV = [['decision', 'Decision A/B'], ...GROUPS.map(([id, label]) => [id, NAV_LABEL[id] ?? label]), ['facts', 'Facts'], ['questions', 'Questions']];
+const ORDER = [];
+const phoneBtn = (key, theme, xl = false) => {
+  ORDER.some((o) => o.key === key && o.xl === xl) || ORDER.push({ key, xl });
+  const label = `${SHORT[key]}, ${theme === 'light' ? 'Mineral Light' : 'Dark'}${xl ? ', 135% text' : ''}. Enlarge`;
+  return `<button type="button" class="phone-btn" data-key="${key}" data-theme="${theme}" data-xl="${xl}" aria-label="${label}"><div class="phone ${theme} ${xl ? 'xl' : ''}">${S[key]()}</div></button>`;
+};
+const cell = (key, theme, xl = false) => `<div class="cell ${theme}"><p class="cap"><span>${theme === 'light' ? 'Mineral Light' : 'Dark'}${xl ? ' · 135% text' : ''}</span><span>Click to enlarge</span></p>${phoneBtn(key, theme, xl)}</div>`;
+const screenRow = (key, n) => `<article class="screen" id="s-${key}">
+  <div class="notes"><div class="num">Screen ${key.split('-')[0]}</div><h3>${SHORT[key]}</h3><p>${meta[key][2]}</p></div>
+  ${cell(key, 'dark')}${cell(key, 'light')}</article>`;
 
+let n = 0;
+const decision = `<section class="section" id="decision">
+  <div class="sh"><h2>Decision A/B: the main decision screen</h2><p class="sub">The moment you choose what to protect next. Compare both layouts side by side.</p></div>
+  <div class="decision-top">
+    <div class="compare"><table>
+      <tr><th></th><th>A · Ranked choice cards</th><th>B · Side-by-side comparison</th></tr>
+      <tr><td>Best at</td><td>One clear decision on a phone; each option says what it protects and what it costs</td><td>Seeing every tradeoff at once</td></tr>
+      <tr><td>Choices inside a choice</td><td>A card opens its own choices</td><td>Needs a second screen</td></tr>
+      <tr><td>Large text (135%)</td><td>Reflows cleanly</td><td>Columns about 95 pt wide; cells wrap to 3–4 lines</td></tr>
+      <tr><td>VoiceOver</td><td>One card at a time, in order</td><td>Reading order has to be set cell by cell</td></tr>
+      <tr><td>Build effort</td><td>Low: existing cards, rails and pills</td><td>Medium: a new comparison grid</td></tr>
+    </table></div>
+    <div class="rec"><b>Recommendation: A</b>Optionally add B as a read-only “Compare side by side” sheet opened from A (the hybrid).
+      <div class="controls"><span class="tog-label" id="size-label">Text size</span><div class="tog" role="group" aria-labelledby="size-label" id="size-toggle"><button type="button" data-size="normal" aria-pressed="true">Normal</button><button type="button" data-size="xl" aria-pressed="false">135%</button></div></div>
+    </div>
+  </div>
+  <div class="ab" data-size="normal" data-maxz="1.25">
+    <div class="abhead">${[['A', 'Ranked choice cards', 'Recommended'], ['B', 'Side-by-side comparison', 'Alternative']].map(([l, n, t]) => `<div><p class="colhead"><span>${l}</span> · ${n}</p><p class="colsub">${t}</p></div>`).join('')}</div>
+    ${['dark', 'light'].map((theme) => `<div class="abrow ${theme}"><p class="cap"><span>${theme === 'light' ? 'Mineral Light' : 'Dark'}</span><span>Click a screen to enlarge</span></p>
+      <div class="abgrid">${['05-options-alt-a-ranked', '06-options-alt-b-compare'].map((key, i) => `<div class="cell ${theme}"><p class="cap mobile-only"><span>${i ? 'B · Side by side' : 'A · Ranked cards'}</span></p><div class="v-normal">${phoneBtn(key, theme)}</div><div class="v-xl">${phoneBtn(key, theme, true)}</div></div>`).join('')}</div></div>`).join('')}
+  </div>
+</section>`;
+const journey = `<section class="section" id="journey"><div class="sh"><h2>Journey</h2><p class="sub">From the recommendation to an approved change, with the alternate paths.</p></div>${flow.replace('<p class="note"', '<p class="flow-note"')}</section>`;
+const groups = GROUPS.map(([id, label, sub, keys]) => `<section class="section" id="${id}"><div class="sh"><h2>${label}</h2><p class="sub">${sub}</p></div>
+  <div class="screens">${keys.map((k) => screenRow(k, ++n)).join('')}</div></section>`).join('');
+const facts = `<section class="section" id="facts"><div class="sh"><h2>Facts vs illustrative values</h2><p class="sub">Real values come from production records and earlier reports. Calorie ranges, outcome ranges, example dates and the future scan are placeholders.</p></div>
+  <div class="facts">${factsTable.trim().replace(/^<div class="facts">/, '').replace(/<\/div>$/, '').replace(/<table>/g, '<div><table>').replace(/<\/table>/g, '</table></div>')}</div></section>`;
+const questions = `<section class="section" id="questions"><div class="sh"><h2>Open questions</h2><p class="sub">Answer these with your A/B choice. Nothing is built until you approve.</p></div><ol class="questions">
+  <li><b>Decision screen:</b> A, B, or hybrid (A with B as a read-only sheet)? Recommended: A or the hybrid.</li>
+  <li><b>Leaning phase:</b> a step inside Build Lean Mass (as shown) or a separate temporary goal?</li>
+  <li><b>How it ends by default:</b> back in 8–9% on a DEXA, or also capped at a maximum length?</li>
+  <li><b>“Keep my current plan”:</b> quiet until the next DEXA only, or also reopen on a clear trend change?</li>
+  <li><b>“Remind me”:</b> only inside the Weekly (as shown), or one reminder notification too?</li>
+  <li><b>DEXA briefings as a trigger</b> for other users: keep them eligible, or start only from Weekly and Monthly?</li>
+  <li><b>Waiting period after a new phase:</b> 21 days plus the next DEXA, or shorter or longer?</li>
+  <li><b>Calories in the review:</b> how big a change is worth showing?</li>
+  <li><b>Below 8% while gaining:</b> acceptable, or also outside your range?</li>
+  <li><b>Goal history:</b> its own screen in Goals, or only inside the goal?</li>
+</ol></section>`;
+const github = `<section class="section" id="github"><div class="sh"><h2>On GitHub</h2></div><div class="links">
+  <span>Design report on <code>main</code>: <code>agent-handoffs/reports/20261010T033524Z-goal-adaptation-founder-scenario-design-mockups.md</code></span>
+  <a href="https://github.com/dustinginn/physiqueos/commit/3682ff19340fd685fd28ba28eb482bd588f55516">Every screenshot on GitHub (design branch commit 3682ff19)</a>
+  <a href="https://github.com/dustinginn/physiqueos/compare/main...claude/goal-adaptation-design-mockups-20261010">Design branch compared with main</a>
+</div></section>`;
+document.getElementById('sections').innerHTML = decision + journey + groups + facts + questions + github;
+document.getElementById('nav').innerHTML = NAV.map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
+
+// Fit each phone to its column (authentic 402 pt layout, scaled as a whole).
+const board = document.getElementById('board');
+function fit() {
+  for (const btn of board.querySelectorAll('.phone-btn')) {
+    const box = btn.closest('.cell'); const w = box?.clientWidth; if (!w) continue;
+    const max = Number(btn.closest('[data-maxz]')?.dataset.maxz ?? 1.15);
+    btn.firstElementChild.style.zoom = Math.min(max, w / 402).toFixed(3);
+  }
+}
+let raf = 0; const refit = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); };
+addEventListener('resize', refit); fit();
+document.fonts?.ready.then(refit);
+
+// Theme filter
+const setMode = (mode) => {
+  board.classList.remove('mode-both', 'mode-dark', 'mode-light'); board.classList.add(`mode-${mode}`);
+  document.querySelectorAll('#theme-filter button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  try { localStorage.setItem('ga-board-mode', mode); } catch {}
+  refit();
+};
+document.querySelectorAll('#theme-filter button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+try { const m = localStorage.getItem('ga-board-mode'); if (['both', 'dark', 'light'].includes(m)) setMode(m); } catch {}
+
+// A/B text size
+document.querySelectorAll('#size-toggle button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelector('.ab').dataset.size = b.dataset.size;
+  document.querySelectorAll('#size-toggle button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  refit();
+}));
+
+// Section highlight
+const links = [...document.querySelectorAll('#nav a')];
+const spy = new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) links.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${e.target.id}`)));
+}, { rootMargin: '-80px 0px -70% 0px' });
+document.querySelectorAll('.section').forEach((s) => spy.observe(s));
+
+// Lightbox
+const lb = document.getElementById('lightbox'); const stage = document.getElementById('lb-stage');
+let cur = { i: 0, theme: 'dark' }; let opener = null;
+function renderLb() {
+  const { key, xl } = ORDER[cur.i];
+  const z = Math.min(1.7, Math.max(0.8, (innerWidth - 60) / 402));
+  stage.innerHTML = `<div class="phone ${cur.theme} ${xl ? 'xl' : ''}" style="zoom:${z.toFixed(3)}">${S[key]()}</div>`;
+  document.getElementById('lb-title').innerHTML = `${SHORT[key]}${xl ? ' · 135% text' : ''}<small>${cur.i + 1} of ${ORDER.length} · ${cur.theme === 'light' ? 'Mineral Light' : 'Dark'}</small>`;
+  document.querySelectorAll('#lb-theme button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === cur.theme)));
+  stage.scrollTop = 0;
+}
+function openLb(btn) {
+  opener = btn;
+  cur = { i: ORDER.findIndex((o) => o.key === btn.dataset.key && String(o.xl) === btn.dataset.xl), theme: btn.dataset.theme };
+  lb.hidden = false; document.documentElement.style.overflow = 'hidden'; renderLb();
+  document.getElementById('lb-close').focus();
+}
+function closeLb() { lb.hidden = true; document.documentElement.style.overflow = ''; opener?.focus(); }
+const step = (d) => { cur.i = (cur.i + d + ORDER.length) % ORDER.length; renderLb(); };
+board.addEventListener('click', (e) => { const btn = e.target.closest('.phone-btn'); if (btn) openLb(btn); });
+document.getElementById('lb-close').addEventListener('click', closeLb);
+document.getElementById('lb-prev').addEventListener('click', () => step(-1));
+document.getElementById('lb-next').addEventListener('click', () => step(1));
+document.querySelectorAll('#lb-theme button').forEach((b) => b.addEventListener('click', () => { cur.theme = b.dataset.theme; renderLb(); }));
+lb.addEventListener('click', (e) => { if (e.target === stage) closeLb(); });
+addEventListener('keydown', (e) => {
+  if (lb.hidden) return;
+  if (e.key === 'Escape') closeLb();
+  else if (e.key === 'ArrowRight') step(1);
+  else if (e.key === 'ArrowLeft') step(-1);
+  else if (e.key.toLowerCase() === 't') { cur.theme = cur.theme === 'dark' ? 'light' : 'dark'; renderLb(); }
+  else if (e.key === 'Tab') { const f = [...lb.querySelectorAll('button')]; const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } }
+});
+addEventListener('resize', () => { if (!lb.hidden) renderLb(); });
 </script>

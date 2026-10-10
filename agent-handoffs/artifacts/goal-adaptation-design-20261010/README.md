@@ -56,3 +56,20 @@ Design-only review artifacts for the Goal Adaptation journey. They use the Found
 - The decorative Home hero arc clips intentionally.
 
 These are real browser renders of a design source. They are not SwiftUI simulator captures.
+
+## Desktop review board (2026-10-10)
+
+The interactive board (`source/interactive-board.html`) is the same page published as the Founder's review board. It is a review wrapper only: the phone screens, copy, colors and decision semantics are unchanged.
+
+- **Navigation:** a sticky category bar covering Decision A/B, Recommendation, Home & alerts, Options, Cut setup, Goal revision, Approval, Next phase, Evidence, Facts and Questions.
+- **Theme filter:** Both / Dark / Mineral Light.
+- **Screen rows:** each row shows notes, then the Dark screen, then the Mineral Light screen. Phones keep their authentic 402 pt layout and are scaled to fit their column, from 1.07× at 1280 to 1.25× on the decision stage.
+- **A/B stage:** Dark and Mineral rows of A next to B, with a Normal / 135% text toggle.
+- **Lightbox:** click any screen to enlarge it to up to 1.7×. Inside it, ← → moves between screens, T switches theme and Esc closes.
+- **Validation** (`review-board/validation.json`, screenshots in `review-board/`):
+  - checked at 1440×900, 1280×800, 1600×1000 and 390×844;
+  - page horizontal overflow 0 at every size;
+  - phone overflow 0, console errors 0;
+  - smallest on-screen phone text 11.7 px at 1280 and 12.6 px at 1440;
+  - the filter, text-size toggle and lightbox (open, next, theme switch, Esc) were each exercised.
+- **Reproduce:** `PLAYWRIGHT_NODE_MODULES=<server>/node_modules node source/validate-review-board.mjs source/interactive-board.html review-board`

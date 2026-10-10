@@ -1,0 +1,110 @@
+{
+  "desktop-1440": {
+    "pageOverflowX": 0,
+    "visiblePhones": 28,
+    "zoomMin": "1.15",
+    "zoomMax": "1.25",
+    "minEffectiveTextPx": "12.6",
+    "overflowPhones": [],
+    "navHeight": 66,
+    "pageHeight": 20438,
+    "stickyBarTopAfterScroll": 0,
+    "filterDark": {
+      "light": 0,
+      "dark": 14,
+      "overflowX": 0
+    },
+    "xlVisible": 4,
+    "lightbox": {
+      "open": true,
+      "title": "Decision A · ranked cards1 of 16 · Dark",
+      "zoom": "1.7",
+      "focus": "lb-close",
+      "afterNext": "Decision A · ranked cards · 135% text2 of 16 · Dark",
+      "afterThemeKey": "phone light xl",
+      "closedOnEsc": true
+    },
+    "errors": []
+  },
+  "laptop-1280": {
+    "pageOverflowX": 0,
+    "visiblePhones": 28,
+    "zoomMin": "1.07",
+    "zoomMax": "1.25",
+    "minEffectiveTextPx": "11.7",
+    "overflowPhones": [],
+    "navHeight": 86,
+    "pageHeight": 19572,
+    "stickyBarTopAfterScroll": 0,
+    "filterDark": {
+      "light": 0,
+      "dark": 14,
+      "overflowX": 0
+    },
+    "xlVisible": 4,
+    "lightbox": {
+      "open": true,
+      "title": "Decision A · ranked cards1 of 16 · Dark",
+      "zoom": "1.7",
+      "focus": "lb-close",
+      "afterNext": "Decision A · ranked cards · 135% text2 of 16 · Dark",
+      "afterThemeKey": "phone light xl",
+      "closedOnEsc": true
+    },
+    "errors": []
+  },
+  "wide-1600": {
+    "pageOverflowX": 0,
+    "visiblePhones": 28,
+    "zoomMin": "1.15",
+    "zoomMax": "1.25",
+    "minEffectiveTextPx": "12.6",
+    "overflowPhones": [],
+    "navHeight": 66,
+    "pageHeight": 20262,
+    "stickyBarTopAfterScroll": 0,
+    "filterDark": {
+      "light": 0,
+      "dark": 14,
+      "overflowX": 0
+    },
+    "xlVisible": 4,
+    "lightbox": {
+      "open": true,
+      "title": "Decision A · ranked cards1 of 16 · Dark",
+      "zoom": "1.7",
+      "focus": "lb-close",
+      "afterNext": "Decision A · ranked cards · 135% text2 of 16 · Dark",
+      "afterThemeKey": "phone light xl",
+      "closedOnEsc": true
+    },
+    "errors": []
+  },
+  "mobile-390": {
+    "pageOverflowX": 0,
+    "visiblePhones": 28,
+    "zoomMin": "0.89",
+    "zoomMax": "0.89",
+    "minEffectiveTextPx": "9.8",
+    "overflowPhones": [],
+    "navHeight": 107,
+    "pageHeight": 34585,
+    "stickyBarTopAfterScroll": 0,
+    "filterDark": {
+      "light": 0,
+      "dark": 14,
+      "overflowX": 0
+    },
+    "xlVisible": 4,
+    "lightbox": {
+      "open": true,
+      "title": "Decision A · ranked cards1 of 16 · Dark",
+      "zoom": "0.821",
+      "focus": "lb-close",
+      "afterNext": "Decision A · ranked cards · 135% text2 of 16 · Dark",
+      "afterThemeKey": "phone light xl",
+      "closedOnEsc": true
+    },
+    "errors": []
+  }
+}
