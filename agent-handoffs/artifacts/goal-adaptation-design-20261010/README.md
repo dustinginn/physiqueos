@@ -73,3 +73,26 @@ The interactive board (`source/interactive-board.html`) is the same page publish
   - smallest on-screen phone text 11.7 px at 1280 and 12.6 px at 1440;
   - the filter, text-size toggle and lightbox (open, next, theme switch, Esc) were each exercised.
 - **Reproduce:** `PLAYWRIGHT_NODE_MODULES=<server>/node_modules node source/validate-review-board.mjs source/interactive-board.html review-board`
+
+## V2: Founder feedback applied (2026-10-10)
+
+Founder-locked decisions are listed in the board's decision ledger. The V2 screens live in `screens-v2/` and come from `source/screens-v2.html`, rendered with `source/render-screens-v2.mjs` (`SOURCE_FILE=screens-v2.html OUT_DIR=screens-v2`).
+
+- **Changed:**
+  - 01 DEXA briefing end and 02 Weekly briefing end: the recommendation is now the last element, after Coach's Insight/Take.
+  - 04 notification: no details in the preview.
+  - 05 Option B, ranked, with timing estimates.
+  - 06 keep building: firm limit disabled, new range and its effective period, Oct 31 warning, strategies carried forward.
+  - 07 leaning setup: energy fields editable, plus an Operating Plan link.
+  - 09 review: revalidated, one approval.
+  - 11 phase complete: honest fat and lean changes.
+- **New:** 08 Operating Plan for this phase; 12 time-limit review.
+- **Unchanged:** 03 Home priority, 04b "Not now" and 10 phase started.
+- **Removed from V2:**
+  - Decision A and the hybrid;
+  - the invented Weekly "This week" card;
+  - the "Too early to judge" screen;
+  - the DEXA goal-timeline card.
+
+  The V1 files stay in `screens/` for history.
+- **Board:** `source/interactive-board.html` is the published V2 board. Its validation output is in `review-board-v2/` (`validation.json` plus screenshots, including browser zoom at 150% and 200% and 135% text).

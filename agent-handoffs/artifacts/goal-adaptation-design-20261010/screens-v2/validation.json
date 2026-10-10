@@ -1,0 +1,291 @@
+{
+  "jakartaLoaded": true,
+  "screens": {
+    "01-dexa-briefing-end-dark": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "01-dexa-briefing-end-light": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "02-weekly-briefing-end-dark": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "02-weekly-briefing-end-light": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "03-home-priority-dark": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [
+        "hero"
+      ],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "03-home-priority-light": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [
+        "hero"
+      ],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "04-notification-dark": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "04-notification-light": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "04b-not-now-sheet-dark": {
+      "width": 402,
+      "height": 914,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "04b-not-now-sheet-light": {
+      "width": 402,
+      "height": 914,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "05-options-b-ranked-dark": {
+      "width": 402,
+      "height": 1047,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "05-options-b-ranked-light": {
+      "width": 402,
+      "height": 1047,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "05-options-b-ranked-dark-xl": {
+      "width": 402,
+      "height": 1387,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "05-options-b-ranked-light-xl": {
+      "width": 402,
+      "height": 1387,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "06-keep-building-validation-dark": {
+      "width": 402,
+      "height": 1210,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "06-keep-building-validation-light": {
+      "width": 402,
+      "height": 1210,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "07-leaning-setup-dark": {
+      "width": 402,
+      "height": 1183,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "07-leaning-setup-light": {
+      "width": 402,
+      "height": 1183,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "08-operating-plan-change-dark": {
+      "width": 402,
+      "height": 1004,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "08-operating-plan-change-light": {
+      "width": 402,
+      "height": 1004,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "09-review-approve-dark": {
+      "width": 402,
+      "height": 913,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "09-review-approve-light": {
+      "width": 402,
+      "height": 913,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "10-phase-started-dark": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "10-phase-started-light": {
+      "width": 402,
+      "height": 874,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "11-phase-complete-honest-dark": {
+      "width": 402,
+      "height": 1006,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "11-phase-complete-honest-light": {
+      "width": 402,
+      "height": 1006,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "12-time-limit-review-dark": {
+      "width": 402,
+      "height": 956,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    },
+    "12-time-limit-review-light": {
+      "width": 402,
+      "height": 956,
+      "overflowX": 0,
+      "escapes": 0,
+      "clipped": [],
+      "textUnder11pt": 0,
+      "targetsUnder44pt": []
+    }
+  },
+  "contrast": {
+    "dark": {
+      "ink/paper": 16.08,
+      "ink2/paper": 11.1,
+      "muted/paper": 6.74,
+      "teal/paper": 9.23,
+      "amberInk/paper": 9.54,
+      "red/paper": 6.19,
+      "green/paper": 10.53,
+      "purple/paper": 7.09,
+      "ink2/soft": 10.28,
+      "muted/canvas": 7.5,
+      "onTeal/teal": 9.69,
+      "onAmber/amber": 9.61
+    },
+    "light": {
+      "ink/paper": 15.23,
+      "ink2/paper": 5.56,
+      "muted/paper": 4.84,
+      "teal/paper": 4.71,
+      "amberInk/paper": 5.7,
+      "red/paper": 5.27,
+      "green/paper": 4.3,
+      "purple/paper": 6.49,
+      "ink2/soft": 5.14,
+      "muted/canvas": 4.23,
+      "onTeal/teal": 4.92,
+      "onAmber/amber": 5.08
+    }
+  }
+}
