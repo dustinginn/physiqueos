@@ -1,5 +1,7 @@
 PhysiqueOS product backlog — durable authority
 
+QUICK VIEW: agent-handoffs/backlog/PHYSIQUEOS_BACKLOG_DASHBOARD.md is the maintained Founder-facing summary. When asked for the backlog, read the dashboard first and reconcile against this detailed authority and the latest reports. Update both on Founder decisions; preserve historical entries here.
+
 Last updated: 2026-10-09
 Owner: Founder
 Purpose: durable cross-chat authority for outstanding product work, accepted deferrals, natural acceptance gates, and next-build integration items.
