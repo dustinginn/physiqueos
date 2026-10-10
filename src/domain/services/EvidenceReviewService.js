@@ -60,14 +60,15 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       };
       return repositories.evidenceReviews.createReview(review);
     },
-    async confirm(id, { evidencePackage, confirmedBy, operationId } = {}) {
-      const review = await repositories.evidenceReviews.getReviewById(id);
+    async confirm(id, { evidencePackage, confirmedBy, operationId,
+      reviewSnapshot = null, commitProgress = null } = {}) {
+      const review = reviewSnapshot ?? await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review is no longer pending.");
       assertNoUnresolvedProvisionalExercises(evidencePackage ?? review.interpretedEvidence);
       assertNoTrainingStructureReviewIssues(evidencePackage ?? review.interpretedEvidence);
       const timestamp = now().toISOString();
       if (typeof repositories.evidenceReviews.completeEvidenceReviewCommit === "function") {
-        assertCommitProgressComplete(review.commitProgress);
+        assertCommitProgressComplete(commitProgress ?? review.commitProgress);
         return repositories.evidenceReviews.completeEvidenceReviewCommit(id, {
           operationId,
           interpretedEvidence: evidencePackage ?? review.interpretedEvidence,
@@ -317,8 +318,6 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       });
     },
     async failCommit(id, error, { operationId } = {}) {
-      const review = await repositories.evidenceReviews.getReviewById(id);
-      const completed = Object.values(review?.commitProgress ?? {}).some((item) => item?.status === "completed");
       if (typeof repositories.evidenceReviews.failEvidenceReviewCommit === "function") {
         return repositories.evidenceReviews.failEvidenceReviewCommit(id, {
           operationId,
@@ -326,6 +325,8 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
           failedAt: now().toISOString(),
         });
       }
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      const completed = Object.values(review?.commitProgress ?? {}).some((item) => item?.status === "completed");
       return repositories.evidenceReviews.updateReview(id, { status: completed ? "partially_committed" : "commit_failed", commitError: String(error?.message ?? error) });
     },
     async recordCommitProgress(id, key, value, { operationId } = {}) {

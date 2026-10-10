@@ -70,6 +70,7 @@ export function createPostConfirmationOrchestrator({ reviewService, handlers = {
         complete,
         executedSteps,
         skippedSteps,
+        progress,
       };
     },
   };

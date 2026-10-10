@@ -27,6 +27,7 @@ import { createBriefingCadenceSettlementGate } from "../../domain/services/Brief
 import { createBriefingSettlementObserver } from "../../domain/services/BriefingSettlementObservability.js";
 import { createRecoveryBriefingComposerV1 } from "../../domain/services/RecoveryBriefingComposerV1.js";
 import { createRecoverySleepInputReaderV1 } from "../../platform/database/RecoverySleepInputReaderV1.js";
+import { createEvidenceProcessingMemoryBudget } from "../../platform/jobs/EvidenceProcessingMemoryBudget.js";
 
 export function createProviderBriefingCadenceRunner({
   pool,
@@ -37,6 +38,7 @@ export function createProviderBriefingCadenceRunner({
   now = () => new Date(),
   runtimeIdentity = null,
   logger = null,
+  memoryBudget = createEvidenceProcessingMemoryBudget(),
 } = {}) {
   if (!pool || !ownerUserId || !authorityStore?.read ||
       typeof loadCanonicalRuntime !== "function" ||
@@ -203,7 +205,12 @@ export function createProviderBriefingCadenceRunner({
   return Object.freeze({
     async execute(options) {
       try {
-        return await tick.execute(options);
+        const { value, measurement } = await memoryBudget.run({
+          operation: "briefing-cadence",
+          estimatedWorkingSetBytes: 350 * 1024 * 1024,
+        }, () => tick.execute(options));
+        logger?.info?.("evidence.processing.memory", measurement);
+        return value;
       } finally {
         // The run ends with the tick: the day snapshot and policy memo are
         // dropped (bounded memory) and nothing is served stale afterward.

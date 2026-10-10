@@ -16,6 +16,7 @@ import {
 } from "../../domain/services/DexaAppointmentLifecycleService.js";
 import { createGuardedBoundedRuntime } from "../../platform/database/BoundedFounderRuntimeRead.js";
 import { loadApplicationCanonicalCommitBindings } from "../runtime/ApplicationCanonicalRuntime.js";
+import { createEvidenceProcessingMemoryBudget } from "../../platform/jobs/EvidenceProcessingMemoryBudget.js";
 
 // A confirmed DEXA scan is one small record, yet every post-confirmation step
 // used to read or rewrite the whole canonical runtime (about 63 MB of canonical
@@ -68,11 +69,40 @@ async function loadProductionBoundedReadContext(input, env = process.env) {
   return loadProductionBoundedFounderReadContext(input);
 }
 
+async function loadProductionDexaReadStore(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") return null;
+  try {
+    const composition = await import("../composition/productionApplicationComposition.js");
+    return typeof composition.getProductionDexaConfirmationReadStore === "function"
+      ? composition.getProductionDexaConfirmationReadStore(env)
+      : null;
+  } catch (error) {
+    if (String(error?.message ?? error).includes("No \"getProductionDexaConfirmationReadStore\" export")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+const STEP_ESTIMATED_WORKING_SET_BYTES = Object.freeze({
+  canonical_commit: 220 * 1024 * 1024,
+  compatibility_writes: 32 * 1024 * 1024,
+  scheduled_completion: 32 * 1024 * 1024,
+  analysis: 96 * 1024 * 1024,
+  training_performance_events: 16 * 1024 * 1024,
+  goal_evaluation: 200 * 1024 * 1024,
+  event_eligibility: 16 * 1024 * 1024,
+  briefing: 250 * 1024 * 1024,
+  home_refresh: 16 * 1024 * 1024,
+});
+
 export function createDexaConfirmationBoundedSteps({
   userId,
   fallbackRepositories,
   loadReadContext = loadProductionBoundedReadContext,
+  loadDexaReadStore = loadProductionDexaReadStore,
   loadCanonicalCommitBindings = loadApplicationCanonicalCommitBindings,
+  memoryBudget = createEvidenceProcessingMemoryBudget(),
   now = () => new Date(),
 } = {}) {
   if (!String(userId ?? "").trim()) throw new Error("Bounded DEXA confirmation steps require the owner.");
@@ -86,6 +116,15 @@ export function createDexaConfirmationBoundedSteps({
     if (!context) return { runtime: null, repositories: fallbackRepositories };
     const runtime = createGuardedBoundedRuntime(context.runtime, collections);
     return { runtime, repositories: boundedRepositories(runtime) };
+  }
+
+  async function directStore() {
+    return loadDexaReadStore?.() ?? null;
+  }
+
+  async function readCanonicalEvidence() {
+    const { repositories } = await read(DEXA_CANONICAL_READ_COLLECTIONS);
+    return repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId);
   }
 
   // Applies one repository operation to the named records only. The operation
@@ -143,13 +182,57 @@ export function createDexaConfirmationBoundedSteps({
   }
 
   return Object.freeze({
+    async runStep(step, operation) {
+      const estimate = STEP_ESTIMATED_WORKING_SET_BYTES[step];
+      if (!estimate) throw new Error(`Unknown bounded DEXA confirmation step ${step}.`);
+      return memoryBudget.run({
+        operation: `dexa-confirmation:${step}`,
+        estimatedWorkingSetBytes: estimate,
+      }, operation);
+    },
     async readCanonicalEvidence() {
-      const { repositories } = await read(DEXA_CANONICAL_READ_COLLECTIONS);
-      return repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId);
+      return readCanonicalEvidence();
+    },
+    async readCanonicalEvidenceByIds(canonicalIds) {
+      const store = await directStore();
+      if (store) return store.getRecords("canonicalEvidenceObjects", canonicalIds);
+      const ids = new Set(canonicalIds ?? []);
+      const canonical = await readCanonicalEvidence();
+      return Array.isArray(canonical)
+        ? canonical.filter((item) => ids.has(item.canonicalId ?? item.id))
+        : canonical;
+    },
+    async readAnalysisByIds(analysisIds) {
+      const store = await directStore();
+      if (store) return store.getRecords("analyses", analysisIds);
+      const ids = new Set(analysisIds ?? []);
+      const { runtime, repositories } = await read(["analyses"]);
+      if (runtime) return runtime.analyses.filter((item) => ids.has(item.id));
+      const records = await Promise.all([...ids].map((id) => repositories.analyses.getAnalysisById(id)));
+      return records.filter(Boolean);
+    },
+    async readDexaCanonicalHistory() {
+      const store = await directStore();
+      if (store) return store.listCanonicalDexaHistory({ limit: 64 });
+      return (await readCanonicalEvidence()).filter((item) =>
+        DEXA_EVIDENCE_TYPES.includes(item.evidence_type)
+      );
     },
     async readDexaScans() {
+      const store = await directStore();
+      if (store) return store.listLegacyDexaHistory({ limit: 64 });
       const { repositories } = await read(DEXA_LEGACY_READ_COLLECTIONS);
       return repositories.dexaScans.listDEXAScans(userId);
+    },
+    async readRecoveryInputs(review) {
+      const packageId = String(review?.interpretedEvidence?.package_id ?? review?.interpretedEvidence?.id ?? "");
+      const store = await directStore();
+      if (store) return store.readRecoveryInputs({ reviewId: review?.id, packageId });
+      const [canonicalEvidenceObjects, briefingReconciliationWorkItems] = await Promise.all([
+        fallbackRepositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
+        fallbackRepositories.briefingReconciliationWorkItems.listWorkItems(userId),
+      ]);
+      return { canonicalEvidenceObjects, briefingReconciliationWorkItems };
     },
     async readGoalEvaluationInputs() {
       const { repositories } = await read(DEXA_GOAL_EVALUATION_READ_COLLECTIONS);

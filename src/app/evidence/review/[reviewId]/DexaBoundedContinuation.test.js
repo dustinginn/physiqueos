@@ -92,6 +92,13 @@ vi.mock("../../../../application/composition/productionApplicationComposition", 
   const { loadCanonicalRuntime } = await import("../../../../platform/migration/phase4CanonicalImport.js");
   return {
     getProductionEvidenceReviewReadService: () => ({}),
+    getProductionDexaConfirmationReadStore: () => ({
+      getRecords: async (collection, ids) => ids.map((id) => harness.state.db.get(collection, id)).filter(Boolean),
+      listCanonicalDexaHistory: async () => harness.state.db.list("canonicalEvidenceObjects")
+        .filter((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type)),
+      listLegacyDexaHistory: async () => harness.state.db.list("dexaScans"),
+      readRecoveryInputs: async () => ({ canonicalEvidenceObjects: [], briefingReconciliationWorkItems: [] }),
+    }),
     async loadProductionBoundedFounderReadContext({ collections, includeApplicationContext = false } = {}) {
       harness.state.boundedReads.push([...collections]);
       const runtime = await loadCanonicalRuntime({
@@ -305,8 +312,8 @@ describe("October 9 DEXA continuation on the bounded path", () => {
       expect(review.commitProgress[step]?.status).toBe("completed");
     }
     expect(review.commitProgress.canonical_commit.attempts).toBe(1);
-    // One durable-resume proof per invocation, and nothing else read the canonical runtime.
-    expect(harness.state.entryCanonicalReads).toBe(outcomes.length);
+    // Resume proof uses named records; no invocation hydrates the canonical collection.
+    expect(harness.state.entryCanonicalReads).toBe(0);
   });
 
   it("reads only the collections each step consumes", async () => {
@@ -317,10 +324,14 @@ describe("October 9 DEXA continuation on the bounded path", () => {
       expect(flat).not.toContain(excluded);
     }
     const db = harness.state.db;
-    // Bounded runtime writes touched only analyses (DEXA interpretation and Goal evaluation).
-    expect([...new Set(db.stats.collectionRewrites)]).toEqual(["analyses"]);
-    // Named-record writes: the one compatibility row and the one appointment.
-    expect(db.stats.recordWrites.sort()).toEqual([`dexaScans:${OBJECT_ID}`, "executionItems:execution_next_dexa"]);
+    // DEXA analyses, compatibility and appointment all use named-record writes.
+    expect([...new Set(db.stats.collectionRewrites)]).toEqual([]);
+    expect(db.stats.recordWrites.sort()).toEqual([
+      `dexaScans:${OBJECT_ID}`,
+      "executionItems:execution_next_dexa",
+      `analyses:analysis_dexa_${CANONICAL_ID}`,
+      `analyses:goal_evaluation_${PACKAGE_ID}`,
+    ].sort());
   });
 
   it("writes one compatibility row carrying the canonical identity, and completes the appointment once", async () => {

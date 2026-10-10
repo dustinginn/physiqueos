@@ -24,6 +24,8 @@ export const DEXA_MEMORY_SCENARIOS = Object.freeze([
   "legacy_analysis", "bounded_analysis",
   "legacy_goal_evaluation", "bounded_goal_evaluation",
   "legacy_briefing", "bounded_briefing",
+  "bounded_end_to_end",
+  "bounded_confirmation_cadence_concurrency",
 ]);
 
 const args = process.argv.slice(2);

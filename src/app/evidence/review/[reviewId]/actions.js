@@ -96,6 +96,7 @@ import { Phase3Command } from "../../../../application/commands/Phase3CommandSer
 import { createInactiveLegacyWebContext } from "../../../../application/auth/legacyWebContext.js";
 import { getProductionApplicationComposition } from "../../../../application/composition/productionApplicationComposition.js";
 import { isHealthKitWorkoutReconciliationReview } from "../../../../domain/services/HealthKitWorkoutReconciliationService.js";
+import { projectEvidenceProcessingState } from "../../../../domain/services/EvidenceProcessingState.js";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -251,27 +252,24 @@ async function executeEvidenceReviewConfirmation(formData, {
   const reviewId = String(formData.get("reviewId") ?? "");
   const operationId = requestedOperationId ?? randomUUID();
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
-  const runInReadScope = FounderRepositories.runInReadScope ?? ((callback) => callback());
-  const { review, user, canonicalCommitRecovery } = await runInReadScope(async () => {
-    const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
-    const currentUser = await FounderRepositories.users.getCurrentUser();
-    let currentCanonicalCommitRecovery = null;
-    if (
-      currentReview?.status === "committing" ||
-      (background && isEvidenceReviewCanonicalSaveComplete(currentReview))
-    ) {
-      currentCanonicalCommitRecovery = await assertDurableResumeState(
-        currentReview,
-        currentUser,
-        service
-      );
-    }
-    return {
-      review: currentReview,
-      user: currentUser,
-      canonicalCommitRecovery: currentCanonicalCommitRecovery,
-    };
-  }, { readModel: "action.evidence-review-confirmation-start" });
+  const startContext = await readConfirmationStartContext(reviewId);
+  const review = startContext?.review ?? null;
+  const user = startContext?.user ?? null;
+  const resumeDexaSteps = review && isDexaOnlyConfirmationPackage(review.interpretedEvidence)
+    ? createDexaConfirmationBoundedSteps({ userId: user?.id, fallbackRepositories: FounderRepositories })
+    : null;
+  let canonicalCommitRecovery = null;
+  if (
+    review?.status === "committing" ||
+    (background && isEvidenceReviewCanonicalSaveComplete(review))
+  ) {
+    canonicalCommitRecovery = await assertDurableResumeState(
+      review,
+      user,
+      service,
+      { dexaSteps: resumeDexaSteps }
+    );
+  }
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   if (isHealthKitWorkoutReconciliationReview(review)) {
     throw new Error("Workout reconciliation must use its guarded resolution action.");
@@ -300,6 +298,7 @@ async function executeEvidenceReviewConfirmation(formData, {
       canonicalStateDurable,
       trainingSessionDurable: canonicalStateDurable &&
         (review.interpretedEvidence?.evidence_objects ?? []).some((item) => item.removed !== true && item.evidence_type === "training"),
+      processing: projectEvidenceProcessingState(review),
     });
   }
   if (background) {
@@ -399,6 +398,7 @@ async function executeEvidenceReviewConfirmation(formData, {
         user,
         canonicalCommitRecovery,
         assertLease,
+        commitProgress: claimedReview.commitProgress ?? {},
       }),
     });
     orchestrationResult = await orchestrator.run(
@@ -418,6 +418,11 @@ async function executeEvidenceReviewConfirmation(formData, {
           canonicalStateDurable,
           trainingSessionDurable: isTrainingConfirmation &&
             canonicalStateDurable,
+          processing: projectEvidenceProcessingState({
+            ...claimedReview,
+            commitProgress: orchestrationResult.progress,
+            commitClaim: { ...claimedReview.commitClaim, status: "available" },
+          }),
         });
       }
       revalidatePath(`/evidence/review/${reviewId}`);
@@ -426,7 +431,13 @@ async function executeEvidenceReviewConfirmation(formData, {
         recoveryContext
       );
     } else {
-      await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id, operationId });
+      await service.confirm(reviewId, {
+        evidencePackage,
+        confirmedBy: user.id,
+        operationId,
+        reviewSnapshot: claimedReview,
+        commitProgress: orchestrationResult.progress,
+      });
     }
   } catch (error) {
     // A worker that lost its lease no longer owns this operation. A successor may
@@ -467,6 +478,11 @@ async function executeEvidenceReviewConfirmation(formData, {
       state: "confirmed", accepted: true, canonicalStateDurable: true,
       trainingSessionDurable: isTrainingConfirmation,
       reviewId, publication: publication.status,
+      processing: projectEvidenceProcessingState({
+        ...claimedReview,
+        status: "confirmed",
+        commitProgress: orchestrationResult.progress,
+      }),
     });
   }
   if (recoveryContext) {
@@ -482,7 +498,28 @@ async function executeEvidenceReviewConfirmation(formData, {
   redirect(confirmedPath);
 }
 
-async function assertDurableResumeState(review, user, reviewService) {
+async function readConfirmationStartContext(reviewId) {
+  if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" &&
+      process.env.NEXT_PHASE !== "phase-production-build") {
+    const readService = getProductionEvidenceReviewReadService();
+    if (typeof readService?.getEditContext === "function") {
+      const editContext = await readService.getEditContext(reviewId);
+      return editContext
+        ? Object.freeze({ review: editContext.review, user: Object.freeze({ id: editContext.userId }) })
+        : null;
+    }
+  }
+  const runInReadScope = FounderRepositories.runInReadScope ?? ((callback) => callback());
+  return runInReadScope(async () => {
+    const [review, user] = await Promise.all([
+      FounderRepositories.evidenceReviews.getReviewById(reviewId),
+      FounderRepositories.users.getCurrentUser(),
+    ]);
+    return Object.freeze({ review, user });
+  }, { readModel: "action.evidence-review-confirmation-start" });
+}
+
+async function assertDurableResumeState(review, user, reviewService, { dexaSteps = null } = {}) {
   if (!user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const packageId = String(review.interpretedEvidence?.package_id ?? review.interpretedEvidence?.id ?? "");
   if (!packageId) throw Object.assign(new Error("Interrupted evidence confirmation package is unavailable."), { code: "COMMIT_PACKAGE_MISMATCH" });
@@ -490,13 +527,18 @@ async function assertDurableResumeState(review, user, reviewService) {
   const canonicalIds = progress.canonical_commit?.result?.canonicalEvidenceIds ?? [];
   let recoveryProof = null;
   if (progress.canonical_commit?.status === "completed") {
-    const canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+    const canonical = dexaSteps
+      ? await dexaSteps.readCanonicalEvidenceByIds(canonicalIds)
+      : await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
     const existingIds = new Set(canonical.map((item) => item.canonicalId ?? item.id));
     if (!canonicalIds.length || canonicalIds.some((id) => !existingIds.has(id))) {
       throw Object.assign(new Error("Interrupted evidence confirmation canonical side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
     }
   } else {
-    recoveryProof = await reviewService.inspectCommitRecovery(review);
+    recoveryProof = await reviewService.inspectCommitRecovery(
+      review,
+      dexaSteps ? await dexaSteps.readRecoveryInputs(review) : undefined
+    );
     if (
       recoveryProof.disposition === CanonicalCommitRecoveryDisposition.AMBIGUOUS ||
       recoveryProof.disposition === CanonicalCommitRecoveryDisposition.DURABLE_PROGRESS
@@ -507,8 +549,12 @@ async function assertDurableResumeState(review, user, reviewService) {
       );
     }
   }
-  for (const analysisId of progress.analysis?.result?.analysisIds ?? []) {
-    if (!await FounderRepositories.analyses.getAnalysisById(analysisId)) {
+  const analysisIds = progress.analysis?.result?.analysisIds ?? [];
+  const persistedAnalyses = dexaSteps
+    ? new Set((await dexaSteps.readAnalysisByIds(analysisIds)).map((item) => item.id))
+    : null;
+  for (const analysisId of analysisIds) {
+    if (persistedAnalyses ? !persistedAnalyses.has(analysisId) : !await FounderRepositories.analyses.getAnalysisById(analysisId)) {
       throw Object.assign(new Error("Interrupted evidence confirmation analysis side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
     }
   }
@@ -806,9 +852,8 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
 }
 
 function createHandlers({ evidencePackage, reviewId, user,
-  canonicalCommitRecovery = null, assertLease = null }) {
+  canonicalCommitRecovery = null, assertLease = null, commitProgress = {} }) {
   const confirmationReads = createEvidenceConfirmationReadService({ repositories: FounderRepositories });
-  const persistAnalyses = createConfirmationAnalysisWriter({ repositories: FounderRepositories });
   const persistProgressPhotos = createConfirmationProgressPhotoWriter({ repositories: FounderRepositories });
   const loadPhotoAnalysisMedia = createPhotoAnalysisMediaLoader({ userId: user.id });
   let canonical = null;
@@ -821,10 +866,17 @@ function createHandlers({ evidencePackage, reviewId, user,
   const dexaSteps = isDexaOnlyConfirmationPackage(committedPackage)
     ? createDexaConfirmationBoundedSteps({ userId: user.id, fallbackRepositories: FounderRepositories })
     : null;
-  const loadCanonicalEvidence = () => dexaSteps
-    ? dexaSteps.readCanonicalEvidence()
+  const persistAnalyses = createConfirmationAnalysisWriter({
+    repositories: FounderRepositories,
+    preferNamedRecords: Boolean(dexaSteps),
+  });
+  const committedCanonicalIds = commitProgress.canonical_commit?.result?.canonicalEvidenceIds ?? [];
+  const loadCanonicalEvidence = () => dexaSteps && committedCanonicalIds.length > 0
+    ? dexaSteps.readCanonicalEvidenceByIds(committedCanonicalIds)
+    : dexaSteps
+      ? dexaSteps.readDexaCanonicalHistory()
     : FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-  return {
+  const handlers = {
     canonical_commit: async () => {
       const energySourceCommit = committedPackage.evidence_objects.some(
         (item) => [
@@ -1131,6 +1183,18 @@ function createHandlers({ evidencePackage, reviewId, user,
       };
     },
   };
+  if (!dexaSteps) return handlers;
+  return Object.fromEntries(Object.entries(handlers).map(([step, handler]) => [
+    step,
+    async (context) => {
+      const { value, measurement } = await dexaSteps.runStep(step, () => handler(context));
+      console.info("evidence.processing.memory", measurement);
+      return {
+        ...value,
+        memoryAdmission: measurement,
+      };
+    },
+  ]));
 }
 
 function isPersistedAtomicPhotoCommit(canonicalObjects, evidencePackage) {

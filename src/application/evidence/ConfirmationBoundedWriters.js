@@ -1,6 +1,7 @@
 import { createAnalysisRepository } from "../../data/repositories/AnalysisRepository.js";
 import { createProgressPhotoRepository } from "../../data/repositories/ProgressPhotoRepository.js";
 import { loadApplicationCanonicalCommitBindings } from "../runtime/ApplicationCanonicalRuntime.js";
+import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 
 // Post-confirmation steps that persist a single collection (analysis, goal
 // evaluation, progress-photo compatibility rows) must not go through the
@@ -34,6 +35,7 @@ function boundedInput(operation, collections) {
 export function createConfirmationAnalysisWriter({
   repositories,
   loadCanonicalCommitBindings = loadApplicationCanonicalCommitBindings,
+  preferNamedRecords = false,
 } = {}) {
   // Persists every analysis of one confirmation unit in a single bounded write.
   // createAnalysis replaces an analysis for the same evidence target, so replaying
@@ -41,7 +43,28 @@ export function createConfirmationAnalysisWriter({
   return async function persistConfirmationAnalyses(analyses = []) {
     const batch = (analyses ?? []).filter(Boolean);
     if (batch.length === 0) return [];
-    const mutate = await loadBoundedMutation(loadCanonicalCommitBindings);
+    const bindings = await loadCanonicalCommitBindings();
+    if (preferNamedRecords && typeof bindings?.mutateCanonicalRecords === "function") {
+      await bindings.mutateCanonicalRecords({
+        operation: "evidence-confirmation-analysis-record-persistence",
+        records: batch.map((item) => ({ collection: "analyses", recordId: item.id })),
+        async mutate({ read }) {
+          const writes = [];
+          for (const analysis of batch) {
+            const existing = read("analyses", analysis.id);
+            if (sameRecord(existing, analysis)) continue;
+            const records = existing ? [structuredClone(existing)] : [];
+            await createAnalysisRepository(records).createAnalysis(structuredClone(analysis));
+            writes.push({ collection: "analyses", recordId: analysis.id, payload: records[0] });
+          }
+          return { writes, result: { analysisIds: batch.map((item) => item.id) } };
+        },
+      });
+      return batch;
+    }
+    const mutate = typeof bindings?.mutateCanonicalRuntime === "function"
+      ? bindings.mutateCanonicalRuntime
+      : null;
     if (!mutate) {
       // Legacy or in-memory composition: no bounded runtime exists, so the
       // repository is the only durable path.
@@ -59,6 +82,12 @@ export function createConfirmationAnalysisWriter({
     });
     return batch;
   };
+}
+
+function sameRecord(left, right) {
+  if (!left) return false;
+  const { version: _version, ...content } = left;
+  return canonicalJson(content) === canonicalJson(right);
 }
 
 export function createConfirmationProgressPhotoWriter({

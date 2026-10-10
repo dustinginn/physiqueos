@@ -16,6 +16,8 @@ import {
 } from "../../../src/platform/database/PostgresFounderRepositoryFacade.js";
 import { loadCanonicalRuntime } from "../../../src/platform/migration/phase4CanonicalImport.js";
 import { createDexaConfirmationBoundedSteps } from "../../../src/application/evidence/DexaConfirmationBoundedSteps.js";
+import { createEvidenceReviewReadService } from "../../../src/application/evidence/EvidenceReviewReadService.js";
+import { createEvidenceProcessingMemoryBudget } from "../../../src/platform/jobs/EvidenceProcessingMemoryBudget.js";
 import { createConfirmationAnalysisWriter } from "../../../src/application/evidence/ConfirmationBoundedWriters.js";
 import { runRepositoryReadScope } from "../../../src/application/read-models/RepositoryReadScope.js";
 import { createSeedRepositories } from "../../../src/data/repositories/createSeedRepositories.js";
@@ -39,6 +41,7 @@ const [scenario, ballastArg = "0"] = process.argv.slice(2);
 const authorityStore = Object.freeze({ claimCanonicalWriteBoundary: async () => {} });
 const BRIEFING_PUBLICATION_COLLECTIONS = ["dailyBriefings", "goalConfidenceSnapshots", "goalConfidenceHistory",
   "confidenceInitializationArtifacts", "confidenceActivationArtifacts"];
+let scenarioDiagnostics = null;
 
 let peakHeapUsed = 0;
 let phasePeak = 0;
@@ -69,6 +72,13 @@ const bindings = Object.freeze({
   mutateCanonicalRuntime: (input) => executePostgresFounderRuntimeMutation({ pool, ownerUserId: OWNER, authorityStore, bounded: true, returnReceipt: true, ...input }),
   mutateCanonicalRecords: (input) => executePostgresFounderRecordMutation({ pool, ownerUserId: OWNER, authorityStore, ...input }),
 });
+const directDexaStore = Object.freeze({
+  getRecords: async (collection, ids) => ids.map((id) => db.get(collection, id)).filter(Boolean),
+  listCanonicalDexaHistory: async () => db.list("canonicalEvidenceObjects")
+    .filter((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type)),
+  listLegacyDexaHistory: async () => db.list("dexaScans"),
+  readRecoveryInputs: async () => ({ canonicalEvidenceObjects: [], briefingReconciliationWorkItems: [] }),
+});
 const steps = createDexaConfirmationBoundedSteps({
   userId: OWNER,
   fallbackRepositories: facade,
@@ -76,8 +86,13 @@ const steps = createDexaConfirmationBoundedSteps({
     runtime: await loadCanonicalRuntime({ query, ownerUserId: OWNER, collections, includeApplicationContext, includeImportMetadata: false }),
   }),
   loadCanonicalCommitBindings: async () => bindings,
+  loadDexaReadStore: async () => directDexaStore,
 });
-const persistAnalyses = createConfirmationAnalysisWriter({ repositories: facade, loadCanonicalCommitBindings: async () => bindings });
+const persistAnalyses = createConfirmationAnalysisWriter({
+  repositories: facade,
+  loadCanonicalCommitBindings: async () => bindings,
+  preferNamedRecords: true,
+});
 
 function compatibilityRow(canonical) {
   const record = canonical.find((item) => item.canonicalId === SYNTHETIC_CANONICAL_ID);
@@ -91,11 +106,16 @@ const dexaAnalysis = (canonical, prior) => createAnalysis({
 const SCENARIOS = {
   // Confirmation entry (every invocation): one in-scope whole-runtime load for the durable-resume proof.
   async entry_scope() {
-    await readScope.run(async () => {
-      await facade.evidenceReviews.getReviewById(SYNTHETIC_REVIEW_ID);
-      await facade.users.getCurrentUser();
-      await facade.canonicalEvidence.listCanonicalEvidenceObjects(OWNER);
+    const readService = createEvidenceReviewReadService({
+      store: {
+        run: (_name, callback) => callback(),
+        getReview: async (id) => db.get("evidenceReviews", id),
+        getOwnerUserId: async () => OWNER,
+      },
     });
+    const context = await readService.getEditContext(SYNTHETIC_REVIEW_ID);
+    const canonicalIds = context.review.commitProgress.canonical_commit.result.canonicalEvidenceIds;
+    await steps.readCanonicalEvidenceByIds(canonicalIds);
   },
   async legacy_compatibility_writes() {
     const canonical = await facade.canonicalEvidence.listCanonicalEvidenceObjects(OWNER);
@@ -152,6 +172,34 @@ const SCENARIOS = {
   async bounded_briefing() {
     await steps.readEventBriefingPreferences();
     await briefing(await steps.loadDexaEventRuntime());
+  },
+  async bounded_end_to_end() {
+    await SCENARIOS.entry_scope();
+    await SCENARIOS.bounded_compatibility_writes();
+    await SCENARIOS.bounded_scheduled_completion();
+    await SCENARIOS.bounded_analysis();
+    await SCENARIOS.bounded_goal_evaluation();
+    await SCENARIOS.bounded_briefing();
+  },
+  async bounded_confirmation_cadence_concurrency() {
+    const budget = createEvidenceProcessingMemoryBudget({ serviceLimitBytes: 1024 * MB });
+    const confirmation = budget.run({
+      operation: "harness-dexa-briefing",
+      estimatedWorkingSetBytes: 250 * MB,
+    }, () => SCENARIOS.bounded_briefing());
+    const cadence = budget.run({
+      operation: "harness-briefing-cadence",
+      estimatedWorkingSetBytes: 350 * MB,
+    }, () => SCENARIOS.legacy_briefing()).then(
+      () => ({ outcome: "executed" }),
+      (error) => ({ outcome: "deferred", code: error?.code ?? null, retryable: error?.retryable === true }),
+    );
+    const [confirmationResult, cadenceResult] = await Promise.all([confirmation, cadence]);
+    scenarioDiagnostics = {
+      confirmationPeakRssFraction: confirmationResult.measurement.peakRssFraction,
+      confirmationQueueWaitMs: confirmationResult.measurement.queueWaitMs,
+      cadence: cadenceResult,
+    };
   },
 };
 
@@ -218,8 +266,10 @@ process.stdout.write(`HARNESS_RESULT ${JSON.stringify({
   sampledGrowthMb: Math.round((peakHeapUsed - start) / MB),
   phasePeakHeapMb: phases,
   maxRssMb: Math.round(process.resourceUsage().maxRSS / 1024),
+  currentRssMb: Math.round(process.memoryUsage().rss / MB),
   elapsedMs: Math.round(performance.now() - startedAt),
   collectionLoads: db.stats.collectionLoads.length,
   collectionRewrites: [...new Set(db.stats.collectionRewrites)],
   recordWrites: db.stats.recordWrites.length,
+  diagnostics: scenarioDiagnostics,
 })}\n`);

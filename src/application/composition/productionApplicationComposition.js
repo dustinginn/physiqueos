@@ -105,6 +105,7 @@ import { createPostgresFounderPhotoAcceptanceStore } from "../../platform/databa
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createPostgresEvidenceTimelineReadStore } from "../../platform/database/PostgresEvidenceTimelineReadStore.js";
 import { createEvidenceTimelineReadService } from "../timeline/EvidenceTimelineReadService.js";
+import { createPostgresDexaConfirmationReadStore } from "../../platform/database/PostgresDexaConfirmationReadStore.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -268,6 +269,17 @@ export async function loadProductionBoundedFounderReadContext({
   return Object.freeze({
     runtime,
     repositories: createSeedRepositories(runtime),
+  });
+}
+
+export function getProductionDexaConfirmationReadStore(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    return null;
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresDexaConfirmationReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
   });
 }
 

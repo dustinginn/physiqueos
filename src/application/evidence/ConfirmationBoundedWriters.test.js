@@ -28,6 +28,32 @@ const analysis = (id, target = id) => createAnalysis({
 });
 
 describe("confirmation analysis writer", () => {
+  it("persists stable DEXA analysis identities as named records without loading the collection", async () => {
+    const records = new Map();
+    const calls = [];
+    const persist = createConfirmationAnalysisWriter({
+      repositories: {},
+      preferNamedRecords: true,
+      loadCanonicalCommitBindings: async () => ({
+        async mutateCanonicalRecords(input) {
+          calls.push(input.records);
+          const outcome = await input.mutate({
+            read: (_collection, id) => records.get(id) ?? null,
+          });
+          outcome.writes.forEach((write) => records.set(write.recordId, write.payload));
+          return { result: outcome.result };
+        },
+      }),
+    });
+    await persist([analysis("dexa-a"), analysis("dexa-b")]);
+    await persist([analysis("dexa-a"), analysis("dexa-b")]);
+    expect(calls).toEqual([
+      [{ collection: "analyses", recordId: "dexa-a" }, { collection: "analyses", recordId: "dexa-b" }],
+      [{ collection: "analyses", recordId: "dexa-a" }, { collection: "analyses", recordId: "dexa-b" }],
+    ]);
+    expect([...records]).toHaveLength(2);
+  });
+
   it("persists a batch in one write that names only the analyses collection", async () => {
     const collections = { analyses: [] };
     const { calls, bindings } = boundedBindings(collections);
